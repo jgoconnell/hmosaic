@@ -1,0 +1,704 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.scripts.processTestData &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.scripts.processTestData</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This is a commandline script for processing the test data.</span>
+<span class="sd">It calls segementation routines, analysis routines, etc. and stores</span>
+<span class="sd">all output in the test corpus. This module also contains some functions</span>
+<span class="sd">for gathering data during experiments.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">shutil</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randint</span>
+
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">csv</span> <span class="kn">import</span> <span class="n">DictWriter</span>
+<span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">Point</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+
+<span class="c"># Project imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic.analyse</span> <span class="kn">import</span> <span class="n">EssentiaAnalyser</span>
+<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span><span class="p">,</span> <span class="n">CorpusExistsException</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">settings</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">segment_corpus</span><span class="p">,</span> <span class="n">analyse_corpus</span><span class="p">,</span> <span class="n">analyse_corpus_files</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">convertAudio</span> <span class="k">as</span> <span class="n">ca</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">switch_ext</span><span class="p">,</span> <span class="n">get_db_connection</span><span class="p">,</span> <span class="n">get_gaia_point</span>
+<span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">DBSegment</span><span class="p">,</span> <span class="n">DBSong</span>
+<span class="kn">from</span> <span class="nn">hmosaic.control</span> <span class="kn">import</span> <span class="n">HighLevelControl</span>
+
+
+<div class="viewcode-block" id="segment"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.segment">[docs]</a><span class="k">def</span> <span class="nf">segment</span><span class="p">(</span><span class="n">chop</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Segment all audio files in the test corpus according to ``chop``.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="n">segment_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">)</span>
+  
+</div>
+<div class="viewcode-block" id="analyse_essentia_units"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.analyse_essentia_units">[docs]</a><span class="k">def</span> <span class="nf">analyse_essentia_units</span><span class="p">(</span><span class="n">chop</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Analyse all essentia units of segmentation type: ``chop`` in the test </span>
+<span class="sd">        corpus.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="n">chop</span><span class="p">)</span>
+    </div>
+<div class="viewcode-block" id="analyse_essentia_files"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.analyse_essentia_files">[docs]</a><span class="k">def</span> <span class="nf">analyse_essentia_files</span><span class="p">(</span><span class="n">corpus_name</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Analyse all essentia units of segmentation type: ``chop`` in the test </span>
+<span class="sd">        corpus.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">corpus_name</span><span class="p">)</span>    
+    <span class="n">analyse_corpus_files</span><span class="p">(</span><span class="n">corpus</span><span class="p">)</span>
+                
+                </div>
+<div class="viewcode-block" id="create_and_populate"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.create_and_populate">[docs]</a><span class="k">def</span> <span class="nf">create_and_populate</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recreates **settings.TEST_CORPUS** from the set of files in </span>
+<span class="sd">        **settings.TEST_DATA_DIR**, converts </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating a test corpus.&quot;</span><span class="p">)</span>
+        <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">CorpusExistsException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Corpus already exists &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Deleting the test corpus&quot;</span><span class="p">)</span>
+        <span class="n">cm</span><span class="o">.</span><span class="n">delete_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Recreating the test corpus.&quot;</span><span class="p">)</span>
+        <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+     
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_DATA_DIR</span><span class="p">)</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">rename_wavs</span><span class="p">()</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">execute_flac_convert</span><span class="p">()</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">execute_mp3_convert</span><span class="p">()</span>
+    
+    <span class="k">for</span> <span class="n">audio_file</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_DATA_DIR</span><span class="p">,</span> <span class="s">&#39;*.wav&#39;</span><span class="p">)):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Storing &#39;</span><span class="si">%s</span><span class="s">&#39; in corpus&quot;</span> <span class="o">%</span> <span class="n">audio_file</span><span class="p">)</span>
+        <span class="n">corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="n">audio_file</span><span class="p">)</span>
+   
+</div>
+<div class="viewcode-block" id="run_tasks"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.run_tasks">[docs]</a><span class="k">def</span> <span class="nf">run_tasks</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Very rough and ready set of instructions to process.</span>
+<span class="sd">        Delete the test_corpus and start over, segment and analyse</span>
+<span class="sd">        different chop sizes. </span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating and populating the test_corpus&quot;</span><span class="p">)</span>
+    <span class="n">create_and_populate</span><span class="p">()</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Segmenting into units of 200 ms&quot;</span><span class="p">)</span>
+    <span class="n">segment</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Segmenting into units of 500 ms&quot;</span><span class="p">)</span>
+    <span class="n">segment</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Segmenting into units of 1250 ms&quot;</span><span class="p">)</span>
+    <span class="n">segment</span><span class="p">(</span><span class="mi">1250</span><span class="p">)</span>
+    
+    <span class="c">#log.info(&quot;Segmenting into units based on onsets&quot;)</span>
+    <span class="c">#segment(&#39;onsets&#39;)</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Analysing audio files using Essentia&quot;</span><span class="p">)</span>
+    <span class="n">analyse_essentia_files</span><span class="p">()</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Analysing  onsets using Essentia&quot;</span><span class="p">)</span>
+    <span class="n">analyse_essentia_units</span><span class="p">(</span><span class="s">&#39;onsets&#39;</span><span class="p">)</span>
+    
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Analysing  units of  500 ms using Essentia&quot;</span><span class="p">)</span>
+    <span class="n">analyse_essentia_units</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Analysing  units of  200 ms using Essentia&quot;</span><span class="p">)</span>
+    <span class="n">analyse_essentia_units</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Analysing  units of  1250 ms using Essentia&quot;</span><span class="p">)</span>
+    <span class="n">analyse_essentia_units</span><span class="p">(</span><span class="mi">1250</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="display_file_values"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.display_file_values">[docs]</a><span class="k">def</span> <span class="nf">display_file_values</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Display an aribitrary set of descriptor values from analysis contained</span>
+<span class="sd">        in **settings.TEST_CORPUS**. The descriptor keys ought to be passed </span>
+<span class="sd">        in ``args``</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">),</span> <span class="s">&#39;r&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;For file </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="n">arg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)</span>
+            <span class="n">newa</span> <span class="o">=</span> <span class="n">a</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+                <span class="n">newa</span> <span class="o">=</span> <span class="n">newa</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;</span><span class="si">%s</span><span class="s"> is </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">newa</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="create_db"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.create_db">[docs]</a><span class="k">def</span> <span class="nf">create_db</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recreates the database with the segment information</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">()</span>
+   
+    
+    <span class="n">db_handle</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">&quot;CREATE TABLE segment &quot;</span>
+    <span class="s">&quot;(id INTEGER PRIMARY KEY, song_name VARCHAR(500), segment_name VARCHAR(500), segment_duration INTEGER, vocal FLOAT, instrumental FLOAT, male FLOAT, female FLOAT)&quot;</span><span class="p">)</span>
+    
+    <span class="n">store</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="add_to_db"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.add_to_db">[docs]</a><span class="k">def</span> <span class="nf">add_to_db</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Recreates the song table in the database.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">()</span>  
+    <span class="n">db_handle</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">&quot;DROP TABLE song &quot;</span><span class="p">)</span> 
+    <span class="n">db_handle</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s">&quot;CREATE TABLE song &quot;</span>
+    <span class="s">&quot;(id INTEGER PRIMARY KEY, song_name VARCHAR(500), vocal FLOAT, instrumental FLOAT, male FLOAT, female FLOAT)&quot;</span><span class="p">)</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            </div>
+<div class="viewcode-block" id="gather_csv_data"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.gather_csv_data">[docs]</a><span class="k">def</span> <span class="nf">gather_csv_data</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function gets given a corpus and extracts the descriptors </span>
+<span class="sd">        given in the *args* to the function. It records this data, </span>
+<span class="sd">        audio file name and segment duration.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="n">fieldnames</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;segment_path&#39;</span><span class="p">,</span> <span class="s">&#39;song_name&#39;</span><span class="p">,</span> <span class="s">&#39;segment_duration&#39;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+        <span class="n">fieldnames</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+   
+    <span class="n">report</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;ExperimentReport.csv&#39;</span><span class="p">,</span> <span class="s">&#39;wb&#39;</span><span class="p">)</span> <span class="c"># Will overwrite any existing file!!</span>
+    <span class="n">csv</span> <span class="o">=</span> <span class="n">DictWriter</span><span class="p">(</span><span class="n">report</span><span class="p">,</span><span class="n">fieldnames</span><span class="p">)</span>
+    <span class="n">csv</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">fieldnames</span><span class="p">,</span> <span class="n">fieldnames</span><span class="p">)))</span>
+    
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">200</span><span class="p">,</span> <span class="mi">500</span><span class="p">,</span> <span class="mi">1250</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> <span class="n">chop</span><span class="o">=</span><span class="n">c</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">),</span> <span class="s">&#39;r&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+                <span class="k">except</span> <span class="ne">IOError</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Analysis not found - must be silent: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="n">vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> <span class="n">c</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+                    <span class="n">newa</span> <span class="o">=</span> <span class="n">a</span>
+                    <span class="n">keys</span> <span class="o">=</span> <span class="n">arg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+                        <span class="n">newa</span> <span class="o">=</span> <span class="n">newa</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                    <span class="n">vals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">newa</span><span class="p">)</span>
+                <span class="n">csv</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">fieldnames</span><span class="p">,</span>  <span class="n">vals</span><span class="p">)))</span>
+    <span class="n">report</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    </div>
+<div class="viewcode-block" id="gather_db_data"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.gather_db_data">[docs]</a><span class="k">def</span> <span class="nf">gather_db_data</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function gets given a corpus and extracts the descriptors </span>
+<span class="sd">        for male, female, vocal and instrumental. It encapsulates this data, </span>
+<span class="sd">        along with audio file name, segment filepath and segment duration in a </span>
+<span class="sd">        `hmosaic.models.DBSegment object and then stores it in a </span>
+<span class="sd">        sqlite database.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;gender&#39;</span><span class="p">)</span>
+    <span class="n">create_db</span><span class="p">()</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">()</span>
+    
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">get_gaia_point</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Analysis not found - must be silent: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">seg</span> <span class="o">=</span> <span class="n">DBSegment</span><span class="p">()</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">song_name</span> <span class="o">=</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)[:</span><span class="mi">10</span><span class="p">])</span> <span class="c">#first 10 characters only</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">segment_name</span> <span class="o">=</span> <span class="nb">unicode</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">segment_duration</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">s</span><span class="p">)))</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">vocal</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">VOCAL</span><span class="p">])</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">instrumental</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">INSTRUMENTAL</span><span class="p">])</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">male</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">MALE</span><span class="p">])</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">female</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">FEMALE</span><span class="p">])</span>
+            <span class="n">store</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">seg</span><span class="p">)</span>
+               
+    <span class="n">store</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>             
+</div>
+<span class="k">def</span> <span class="nf">create_mood_mosaics</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Given a path to some mood music this function loads up the moods,</span>
+<span class="sd">        creates a mosaic with each mood and saves them.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">SOURCE_REPO</span><span class="p">)</span>
+    
+    <span class="n">control</span> <span class="o">=</span> <span class="n">OSCControl</span><span class="p">(</span><span class="n">cm</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">control</span><span class="o">.</span><span class="n">set_source_corpus</span><span class="p">(</span><span class="s">&#39;mixedcorpus&#39;</span><span class="p">)</span>
+    <span class="n">moods_dataset</span> <span class="o">=</span> <span class="s">&#39;/home/john/Moods&#39;</span>
+    <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">moods_dataset</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">current_mood</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">directory</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="n">dir_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">moods_dataset</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">dir_path</span><span class="p">)</span>
+            <span class="c">#ca.execute_mp3_convert()</span>
+            <span class="c">#ca.rename_wavs()   </span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="s">&#39;*.wav&#39;</span><span class="p">):</span>
+                <span class="c">#map(lambda p: os.path.join(dir_path, p), os.listdir(dir_path)):</span>
+                <span class="n">control</span><span class="o">.</span><span class="n">set_target</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">control</span><span class="o">.</span><span class="n">process_target</span><span class="p">()</span>
+                <span class="n">control</span><span class="o">.</span><span class="n">set_constraints</span><span class="p">([</span><span class="n">current_mood</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+                <span class="n">control</span><span class="o">.</span><span class="n">mosaic_from_target</span><span class="p">()</span>
+                <span class="n">control</span><span class="o">.</span><span class="n">save_mosaic</span><span class="p">(</span><span class="s">&#39;mood&#39;</span> <span class="o">+</span> <span class="n">directory</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">))</span>
+                  
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Mood: &#39;</span><span class="si">%s</span><span class="s">&#39; does not exist: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="n">e</span><span class="p">))</span>
+
+<div class="viewcode-block" id="check_gender"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.check_gender">[docs]</a><span class="k">def</span> <span class="nf">check_gender</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the analysis in *TEST_CORPUS* in order to ascertain the male/female</span>
+<span class="sd">        values of each one. Those which score higher than 0.85 are </span>
+<span class="sd">        added to a list which is returned</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="n">high_achievers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">get_gaia_point</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">MALE</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mf">0.85</span> <span class="ow">or</span> <span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">FEMALE</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mf">0.85</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found a new high achiever: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">high_achievers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Analysis not found - must be silent: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">continue</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found </span><span class="si">%d</span><span class="s"> high achievers&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">high_achievers</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">high_achievers</span>
+</div>
+<div class="viewcode-block" id="run_gender_analysis"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.run_gender_analysis">[docs]</a><span class="k">def</span> <span class="nf">run_gender_analysis</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Analyse the files in a corpus called **gender**</span>
+<span class="sd">        in **settings.TEST_CORPUS_REPO**.</span>
+<span class="sd"> </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">gender_songs</span> <span class="o">=</span> <span class="n">check_gender</span><span class="p">()</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;gender&#39;</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;gender&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">gender_songs</span><span class="p">:</span>
+        <span class="n">corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">),</span> <span class="n">corpus</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+    <span class="n">segment_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">)</span>
+    <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="mi">2000</span><span class="p">)</span>
+    <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="mi">4000</span><span class="p">)</span>
+    
+    </div>
+<div class="viewcode-block" id="run_gender_report"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.run_gender_report">[docs]</a><span class="k">def</span> <span class="nf">run_gender_report</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the database and runs a report. </span>
+<span class="sd">        We include vocal/instrumental and male/female. </span>
+<span class="sd">        Actual gender will have to be entered manually.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fieldnames</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;song_name&#39;</span><span class="p">,</span> <span class="s">&#39;song_male&#39;</span><span class="p">,</span> <span class="s">&#39;song_female&#39;</span><span class="p">,</span> <span class="s">&#39;segment_name&#39;</span><span class="p">,</span> <span class="s">&#39;segment_duration&#39;</span><span class="p">,</span> <span class="s">&#39;male&#39;</span><span class="p">,</span> <span class="s">&#39;female&#39;</span><span class="p">,</span> 
+        <span class="s">&#39;instrumental&#39;</span><span class="p">,</span> <span class="s">&#39;vocal&#39;</span><span class="p">,</span> <span class="s">&#39;gender&#39;</span><span class="p">]</span>
+    
+   
+    <span class="n">report</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s">&#39;ExperimentGenderReport.csv&#39;</span><span class="p">,</span> <span class="s">&#39;wb&#39;</span><span class="p">)</span> <span class="c"># Will overwrite any existing file!!</span>
+    <span class="n">csv</span> <span class="o">=</span> <span class="n">DictWriter</span><span class="p">(</span><span class="n">report</span><span class="p">,</span><span class="n">fieldnames</span><span class="p">)</span>
+    <span class="c"># write header first</span>
+    <span class="n">csv</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">fieldnames</span><span class="p">,</span> <span class="n">fieldnames</span><span class="p">)))</span>
+    <span class="n">dbname</span> <span class="o">=</span> <span class="s">&#39;gender24.db&#39;</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">(</span><span class="n">dbname</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">DBSong</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+        <span class="n">res2</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">DBSegment</span><span class="p">,</span> <span class="n">song_name</span><span class="o">=</span><span class="n">r</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+        <span class="n">csv</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">fieldnames</span><span class="p">,</span> <span class="p">[</span><span class="n">r</span><span class="o">.</span><span class="n">song_name</span><span class="p">,</span> <span class="n">res2</span><span class="o">.</span><span class="n">male</span><span class="p">,</span> <span class="n">res2</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">segment_name</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">segment_duration</span><span class="p">,</span> 
+            <span class="n">r</span><span class="o">.</span><span class="n">male</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">female</span><span class="p">,</span>  <span class="n">r</span><span class="o">.</span><span class="n">instrumental</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">vocal</span><span class="p">,</span> <span class="s">u&#39;&#39;</span><span class="p">])))</span>
+    
+</div>
+<div class="viewcode-block" id="gender_breakdown"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.gender_breakdown">[docs]</a><span class="k">def</span> <span class="nf">gender_breakdown</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">       Process the results of the gender analysis experiments</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dbname</span><span class="o">=</span><span class="s">&#39;gender24.db&#39;</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">(</span><span class="n">dbname</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">DBSegment</span><span class="p">)</span>
+    <span class="n">res</span><span class="o">.</span><span class="n">group_by</span><span class="p">(</span><span class="n">DBSegment</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+    <span class="n">song_names</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">res</span><span class="p">:</span>
+        <span class="n">song_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">song_names</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">dur</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">4000</span><span class="p">]:</span>
+            <span class="n">male</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">female</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">temp_res</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="n">DBSegment</span><span class="p">,</span> <span class="n">song_name</span><span class="o">=</span><span class="n">s</span><span class="p">,</span> <span class="n">segment_duration</span><span class="o">=</span><span class="n">dur</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">seg</span> <span class="ow">in</span> <span class="n">temp_res</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">seg</span><span class="o">.</span><span class="n">male</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                    <span class="n">male</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seg</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">seg</span><span class="o">.</span><span class="n">female</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                    <span class="n">female</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">seg</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">print</span> <span class="s">&quot;Got an even split: </span><span class="si">%s</span><span class="s"> - female: </span><span class="si">%f</span><span class="s">, male: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">seg</span><span class="o">.</span><span class="n">song_name</span><span class="p">,</span> <span class="n">seg</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">seg</span><span class="o">.</span><span class="n">male</span><span class="p">)</span>
+            <span class="k">print</span> <span class="n">s</span> <span class="o">+</span> <span class="s">&#39; &#39;</span> <span class="o">+</span> <span class="s">&#39;</span><span class="si">%d</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">dur</span> <span class="o">+</span> <span class="s">&quot; Total segments: </span><span class="si">%d</span><span class="s"> &quot;</span> <span class="o">%</span> <span class="n">temp_res</span><span class="o">.</span><span class="n">count</span><span class="p">()</span> <span class="o">+</span> <span class="s">&quot; female </span><span class="si">%d</span><span class="s"> &quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">female</span><span class="p">)</span><span class="o">+</span> <span class="s">&quot;male </span><span class="si">%d</span><span class="s"> &quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">male</span><span class="p">)</span>
+        
+        
+</div>
+<div class="viewcode-block" id="add_gender"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.add_gender">[docs]</a><span class="k">def</span> <span class="nf">add_gender</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the analysis in *TEST_CORPUS* in order to ascertain the male/female</span>
+<span class="sd">        values of each one. Those which score higher than 0.85 have their values </span>
+<span class="sd">        plus their name added to the db.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">(</span><span class="s">&#39;gender.db&#39;</span><span class="p">)</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS</span><span class="p">)</span>
+    <span class="n">high_achievers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">get_gaia_point</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">MALE</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mf">0.85</span> <span class="ow">or</span> <span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">FEMALE</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mf">0.85</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found a new high achiever: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">high_achievers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="n">DBSong</span><span class="p">()</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">song_name</span><span class="o">=</span><span class="nb">unicode</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">)[:</span><span class="mi">10</span><span class="p">])</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">male</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">MALE</span><span class="p">])</span>
+                <span class="n">s</span><span class="o">.</span><span class="n">female</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">FEMALE</span><span class="p">])</span>
+                <span class="n">store</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Analysis not found - must be silent: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">continue</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found </span><span class="si">%d</span><span class="s"> high achievers&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">high_achievers</span><span class="p">))</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">store</span>
+</div>
+<div class="viewcode-block" id="map_mosaics"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.map_mosaics">[docs]</a><span class="k">def</span> <span class="nf">map_mosaics</span><span class="p">(</span><span class="n">corpus_name</span><span class="p">,</span> <span class="n">chop</span><span class="p">,</span> <span class="n">from_scratch</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">hop</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns dictionary containing mood values over time for all</span>
+<span class="sd">        audio files in the test corpus. The resolution of the graphs can be </span>
+<span class="sd">        increased using the **hop** parameter</span>
+<span class="sd">        (a value between 0 and 1 indicating overlap factor).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TEST_CORPUS_REPO</span><span class="p">)</span>       
+    <span class="n">c</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">corpus_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">from_scratch</span><span class="p">:</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="n">EssentiaAnalyser</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+            <span class="n">c</span><span class="o">.</span><span class="n">segment_audio</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">chop</span><span class="p">,</span> <span class="n">hop</span><span class="p">)</span>
+            <span class="n">e</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">):</span>
+                <span class="n">e</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>  
+    
+    <span class="n">graphs</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;RELAXED&#39;</span><span class="p">:{},</span> <span class="s">&#39;SAD&#39;</span><span class="p">:{},</span> <span class="s">&#39;HAPPY&#39;</span><span class="p">:{},</span> <span class="s">&#39;AGGRESSIVE&#39;</span><span class="p">:{}}</span>
+
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="n">analysis</span> <span class="o">=</span> <span class="p">[</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> 
+            <span class="n">c</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">f</span><span class="p">)]</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">analysis</span><span class="p">:</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+            <span class="n">points</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">graphs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">graphs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+                <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">k</span><span class="p">)]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]})</span>
+
+    <span class="k">return</span> <span class="n">graphs</span>
+</div>
+<div class="viewcode-block" id="equalise"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.equalise">[docs]</a><span class="k">def</span> <span class="nf">equalise</span><span class="p">(</span><span class="n">seq1</span><span class="p">,</span> <span class="n">seq2</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Takes two sequences finds out which one is longer and</span>
+<span class="sd">        reduces elements from the end of this in order to make it</span>
+<span class="sd">        the same length as the smaller one.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq1</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq2</span><span class="p">):</span>
+        <span class="n">seq1</span> <span class="o">=</span> <span class="n">seq1</span><span class="p">[:(</span><span class="nb">len</span><span class="p">(</span><span class="n">seq2</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">seq1</span><span class="p">))]</span>
+    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq2</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">seq1</span><span class="p">):</span>
+        <span class="n">seq2</span> <span class="o">=</span> <span class="n">seq2</span><span class="p">[:(</span><span class="nb">len</span><span class="p">(</span><span class="n">seq1</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">seq2</span><span class="p">))]</span>
+    <span class="k">return</span> <span class="n">seq1</span><span class="p">,</span> <span class="n">seq2</span>
+</div>
+<span class="n">mdiff</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">tar</span><span class="p">,</span> <span class="n">m</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tar</span><span class="p">,</span> <span class="n">m</span><span class="p">)))</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>   
+
+<div class="viewcode-block" id="calc_similarity"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.calc_similarity">[docs]</a><span class="k">def</span> <span class="nf">calc_similarity</span><span class="p">(</span><span class="n">graphs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This takes the graphs variable returned by the map_mosaics </span>
+<span class="sd">        function and calculates the average of the distance between </span>
+<span class="sd">        target and mosaics for each of the moods.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">mood</span> <span class="ow">in</span> <span class="n">graphs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="n">tar</span> <span class="o">=</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="s">&#39;TARGET.wav&#39;</span><span class="p">]</span>
+        <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s">&#39;TARGET.wav&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">mname</span> <span class="ow">in</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">tar</span><span class="p">,</span> <span class="n">m</span> <span class="o">=</span> <span class="n">equalise</span><span class="p">(</span><span class="n">tar</span><span class="p">,</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">mname</span><span class="p">])</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;The average of the distances between </span><span class="si">%s</span><span class="s"> </span><span class="se">\</span>
+<span class="s">                and the target for </span><span class="si">%s</span><span class="s"> mood is </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">mname</span><span class="p">,</span> <span class="n">mood</span><span class="p">,</span> <span class="n">mdiff</span><span class="p">(</span><span class="n">tar</span><span class="p">,</span> <span class="n">m</span><span class="p">)))</span>
+            
+  </div>
+<div class="viewcode-block" id="dataset_metrics"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.dataset_metrics">[docs]</a><span class="k">def</span> <span class="nf">dataset_metrics</span><span class="p">(</span><span class="n">graphs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This takes the graphs variable returned from the *map_mosaics* function </span>
+<span class="sd">        and transforms it, showing the distance between the pairs of mosaics for the two corpora.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">re</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;RELAXED&#39;</span><span class="p">:{},</span> <span class="s">&#39;SAD&#39;</span><span class="p">:{},</span> <span class="s">&#39;HAPPY&#39;</span><span class="p">:{},</span> <span class="s">&#39;AGGRESSIVE&#39;</span><span class="p">:{}}</span>
+    <span class="c"># First step is to extract all the targets</span>
+    <span class="k">for</span> <span class="n">mood</span> <span class="ow">in</span> <span class="n">graphs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s">&#39;TARGET.wav&#39;</span><span class="p">):</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">f</span><span class="p">:{}})</span>
+    <span class="c"># Now find 4 mosaics for each target</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&#39;Onsets[A-Z]+\d{1}&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">mood</span> <span class="ow">in</span> <span class="n">metrics</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]:</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">f</span><span class="p">:[]})</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+            <span class="n">matches</span> <span class="o">=</span>  <span class="p">[</span><span class="n">f2</span> <span class="k">for</span> <span class="n">f2</span> <span class="ow">in</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">f2</span><span class="p">)</span><span class="o">.</span><span class="n">group</span><span class="p">()</span> <span class="o">==</span> <span class="n">m</span><span class="p">]</span>
+            <span class="n">matches</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">mat</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">:</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">f</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">mat</span><span class="p">,</span> <span class="n">mdiff</span><span class="p">(</span><span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">f</span><span class="p">],</span> <span class="n">graphs</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">mat</span><span class="p">])))</span>
+    <span class="k">return</span> <span class="n">metrics</span>
+            
+</div>
+<div class="viewcode-block" id="ttest_metrics"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.processTestData.ttest_metrics">[docs]</a><span class="k">def</span> <span class="nf">ttest_metrics</span><span class="p">(</span><span class="n">graphs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This takes the graphs variable returned from the *map_mosaics* function </span>
+<span class="sd">        and transforms it, calculating ttests between the target and each mosaic.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="n">dataset_metrics</span><span class="p">(</span><span class="n">graphs</span><span class="p">)</span>
+    <span class="n">new_metrics</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;RELAXED&#39;</span><span class="p">:{},</span> <span class="s">&#39;SAD&#39;</span><span class="p">:{},</span> <span class="s">&#39;HAPPY&#39;</span><span class="p">:{},</span> <span class="s">&#39;AGGRESSIVE&#39;</span><span class="p">:{}}</span>
+    <span class="k">for</span> <span class="n">mood</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;HAPPY&#39;</span><span class="p">,</span> <span class="s">&#39;SAD&#39;</span><span class="p">,</span> <span class="s">&#39;RELAXED&#39;</span><span class="p">,</span> <span class="s">&#39;AGGRESSIVE&#39;</span><span class="p">]:</span>
+        <span class="nb">map</span><span class="p">(</span><span class="nb">list</span><span class="o">.</span><span class="n">sort</span><span class="p">,</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">]</span> 
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]])</span>
+        <span class="n">llScores</span> <span class="o">=</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> 
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]]</span>
+        <span class="n">hlScores</span> <span class="o">=</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]]</span>
+        <span class="c"># Make sure the results are all in the same order!!</span>
+        <span class="nb">map</span><span class="p">(</span><span class="nb">list</span><span class="o">.</span><span class="n">sort</span><span class="p">,</span> <span class="p">[</span><span class="n">hlScores</span><span class="p">,</span> <span class="n">llScores</span><span class="p">])</span>
+        <span class="c"># Just the numbers please!</span>
+        <span class="n">hlAvgs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">hlScores</span><span class="p">]</span>
+        <span class="n">llAvgs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">llScores</span><span class="p">]</span>
+        <span class="n">tstat</span><span class="p">,</span> <span class="n">pval</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">ttest_rel</span><span class="p">(</span><span class="n">llAvgs</span><span class="p">,</span> <span class="n">hlAvgs</span><span class="p">)</span>
+        <span class="n">new_metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;NH_diff&#39;</span><span class="p">:</span> <span class="n">llScores</span><span class="p">})</span>
+        <span class="n">new_metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;H_diff&#39;</span><span class="p">:</span> <span class="n">hlScores</span><span class="p">})</span>
+        <span class="n">new_metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;ttest&#39;</span><span class="p">:</span> <span class="n">tstat</span><span class="p">})</span>
+        <span class="n">new_metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;pval&#39;</span><span class="p">:</span> <span class="n">pval</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">new_metrics</span>
+</div>
+<span class="k">def</span> <span class="nf">pick_mood_collection</span><span class="p">():</span>
+    
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="n">sad_songs</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;wav&#39;</span><span class="p">,</span>
+        <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;sad&#39;</span><span class="p">,</span>  <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;sad&#39;</span><span class="p">))])</span>
+    <span class="n">happy_songs</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;wav&#39;</span><span class="p">,</span> 
+        <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;happy&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;happy&#39;</span><span class="p">))])</span>
+    <span class="n">relaxed_songs</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;wav&#39;</span><span class="p">,</span> 
+        <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;relaxed&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;relaxed&#39;</span><span class="p">))])</span>
+    <span class="n">aggressive_songs</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;.&#39;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#39;wav&#39;</span><span class="p">,</span> 
+        <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;aggressive&#39;</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+           <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_DATASET</span><span class="p">,</span> <span class="s">&#39;aggressive&#39;</span><span class="p">))])</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">sad_songs</span><span class="p">[</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">111</span><span class="p">)],</span> 
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">,</span> 
+                <span class="s">&#39;SADTARGET</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">happy_songs</span><span class="p">[</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">111</span><span class="p">)],</span> 
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">,</span> 
+                <span class="s">&#39;HAPPYTARGET</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">relaxed_songs</span><span class="p">[</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">111</span><span class="p">)],</span> 
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">,</span> 
+                <span class="s">&#39;RELAXEDTARGET</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">aggressive_songs</span><span class="p">[</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">111</span><span class="p">)],</span> 
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">,</span> 
+                <span class="s">&#39;AGGRESSIVETARGET</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)))</span>
+
+<span class="k">def</span> <span class="nf">create_mood_mosaics</span><span class="p">():</span>
+    <span class="kn">from</span> <span class="nn">hmosaic.control</span> <span class="kn">import</span> <span class="n">HighLevelControl</span>
+    <span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span>
+    <span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">settings</span>
+    <span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">get_files_recursive</span>
+    <span class="n">targets</span> <span class="o">=</span> <span class="n">get_files_recursive</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">MOOD_COLLECTION</span><span class="p">)</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">SOURCE_REPO</span><span class="p">)</span>
+    <span class="n">constraints</span> <span class="o">=</span> <span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">HAPPY</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">RELAXED</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">AGGRESSIVE</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span>
+         <span class="n">settings</span><span class="o">.</span><span class="n">SAD</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">con</span> <span class="o">=</span> <span class="n">HighLevelControl</span><span class="p">(</span><span class="n">cm</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="c"># Set identical constraints in both levels of the hieracrchy </span>
+    <span class="n">con</span><span class="o">.</span><span class="n">setConstraints</span><span class="p">(</span><span class="n">constraints</span><span class="p">)</span>
+    <span class="n">con</span><span class="o">.</span><span class="n">setHLConstraints</span><span class="p">(</span><span class="n">constraints</span><span class="p">)</span>
+    <span class="c">#con.setHighScope(10) # Adjust this depending on quality of the results</span>
+    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">targets</span><span class="p">:</span>
+        <span class="c"># For each target generate 4 mosaics, 2 for source sorpus, </span>
+        <span class="c"># 1 time-stretched onset segmented, the other fixed size segmentation</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">setTarget</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;onsets&#39;</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">highlevel</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="n">con</span><span class="o">.</span><span class="n">processTarget</span><span class="p">()</span>
+        <span class="c">#con.chop=500</span>
+        <span class="c">#con.processTarget()</span>
+        <span class="c">#con.chop=&#39;onsets&#39;</span>
+        <span class="c">#con.target_chop=&#39;onsets&#39;</span>
+        <span class="c">#con.process_target_hl()</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;sunra&#39;</span><span class="p">]:</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">setSourceCorpus</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">trackLength</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">createMosaic</span><span class="p">()</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">saveMosaic</span><span class="p">(</span><span class="s">&#39;hlOnsets</span><span class="si">%s</span><span class="s">_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">con</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">),</span> <span class="n">name</span><span class="p">))</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">highlevel</span><span class="o">=</span><span class="bp">False</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">createMosaic</span><span class="p">()</span>
+            <span class="n">con</span><span class="o">.</span><span class="n">saveMosaic</span><span class="p">(</span><span class="s">&#39;llOnsets</span><span class="si">%s</span><span class="s">_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">con</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">),</span> <span class="n">name</span><span class="p">))</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            con.chop=500</span>
+<span class="sd">            con.target_chop=500</span>
+<span class="sd">            con.trackLength(0)</span>
+<span class="sd">            #con.processTarget()</span>
+<span class="sd">            con.createMosaic()</span>
+<span class="sd">            con.saveMosaic(&#39;llFixed%s_%s&#39; % (switch_ext(con.target.filepath, &#39;&#39;), name))</span>
+<span class="sd">        con.highlevel=True</span>
+<span class="sd">        con.process_target_hl()</span>
+<span class="sd">        for name in [&#39;sunra&#39;, &#39;motown&#39;]:</span>
+<span class="sd">            con.setSourceCorpus(name)   </span>
+<span class="sd">            con.createMosaic()</span>
+<span class="sd">            con.saveMosaic(&#39;hlFixed%s_%s&#39; % (switch_ext(con.target.filepath, &#39;&#39;), name))</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            
+
+    
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">create_mood_mosaics</span><span class="p">()</span>
+    <span class="c">#graphs = map_mosaics(&#39;testAudio&#39;)</span>
+    <span class="c">#plot_graphs(graphs)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+    <span class="c">#create_and_populate()</span>
+    <span class="c">#analyse_essentia_files(&#39;moods&#39;)</span>
+    <span class="c">#display_file_values(settings.SAD, settings.HAPPY, settings.RELAXED, settings.AGGRESSIVE)</span>
+    <span class="c">#gather_db_data()</span>
+    <span class="c">#run_tasks()</span>
+    <span class="c">#report_descriptor_accuracy(&#39;label.&#39; + settings.MALE, &#39;label.&#39; + settings.FEMALE)</span>
+    <span class="c">#gender_breakdown()</span>
+    <span class="c">#</span>
+    <span class="n">add_to_db</span><span class="p">()</span>
+    <span class="n">add_gender</span><span class="p">()</span>
+    <span class="n">run_gender_report</span><span class="p">()</span>
+    <span class="c">#create_mood_mosaics()</span>
+    <span class="c">#run_gender_analysis()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

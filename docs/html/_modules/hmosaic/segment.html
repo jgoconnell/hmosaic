@@ -1,0 +1,335 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.segment &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.segment</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Contains all models related to segmentation. </span>
+<span class="sd">Aubio and Essentia are both utilised by different routines.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="c"># Third party library imports</span>
+<span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">wavread</span><span class="p">,</span> <span class="n">wavwrite</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">essentia</span> <span class="kn">import</span> <span class="n">Pool</span>
+<span class="kn">from</span> <span class="nn">essentia.standard</span> <span class="kn">import</span> <span class="n">AudioOnsetsMarker</span><span class="p">,</span> <span class="n">MonoLoader</span><span class="p">,</span> <span class="n">OnsetDetection</span>
+<span class="kn">from</span> <span class="nn">essentia.standard</span> <span class="kn">import</span> <span class="n">Windowing</span><span class="p">,</span> <span class="n">Spectrum</span><span class="p">,</span> <span class="n">Flux</span><span class="p">,</span> <span class="n">FFT</span><span class="p">,</span> <span class="n">CartesianToPolar</span> 
+<span class="kn">from</span> <span class="nn">essentia.standard</span> <span class="kn">import</span> <span class="n">FrameGenerator</span><span class="p">,</span> <span class="n">Onsets</span><span class="p">,</span> <span class="n">RMS</span>
+
+<span class="c"># hmosaic package imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">chop_to_ms</span><span class="p">,</span> <span class="n">get_fixed_onsets</span><span class="p">,</span> <span class="n">secs_to_samps</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">to_mono</span><span class="p">,</span> <span class="n">switch_ext</span>
+<span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">SegmentAudio</span><span class="p">,</span> <span class="n">Unit</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+
+
+
+<div class="viewcode-block" id="AudioSegmenter"><a class="viewcode-back" href="../../index.html#hmosaic.segment.AudioSegmenter">[docs]</a><span class="k">class</span> <span class="nc">AudioSegmenter</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Basic fixed length segmenter. Is initialised with a given </span>
+<span class="sd">        ``chop`` size (in ms) and provides methods to retrieve an array</span>
+<span class="sd">        of marked audio data and a generator function to yield units</span>
+<span class="sd">        of segmented audio, which can be written to the corpus.</span>
+<span class="sd">        This class may be considered the base class for a segmenter.</span>
+<span class="sd">        Any subclasses ought to override these 3 object functions</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">hop</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Set the chop time and/or hopsize here.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chop</span> <span class="o">=</span> <span class="n">chop</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hop</span> <span class="o">=</span> <span class="n">hop</span>
+        
+<div class="viewcode-block" id="AudioSegmenter.segment"><a class="viewcode-back" href="../../index.html#hmosaic.segment.AudioSegmenter.segment">[docs]</a>    <span class="k">def</span> <span class="nf">segment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Tries to create an Audio instance here.</span>
+<span class="sd">            Yields segments of sample data.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">SegmentAudio</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">unit_length</span> <span class="o">=</span> <span class="n">chop_to_ms</span><span class="p">(</span><span class="n">audio</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">hop</span><span class="p">:</span>
+            <span class="n">increment</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">unit_length</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">hop</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">increment</span> <span class="o">=</span> <span class="n">unit_length</span>
+        <span class="c"># Slice the audio and break into units</span>
+        <span class="k">for</span> <span class="n">unit_begin</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">audio</span><span class="o">.</span><span class="n">audio_array</span><span class="p">),</span> <span class="n">increment</span><span class="p">):</span>
+            <span class="n">unit</span> <span class="o">=</span> <span class="n">audio</span><span class="o">.</span><span class="n">audio_array</span><span class="p">[</span><span class="n">unit_begin</span><span class="p">:</span> <span class="n">unit_begin</span> <span class="o">+</span> <span class="n">unit_length</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span> <span class="o">==</span> <span class="n">unit_length</span><span class="p">:</span> <span class="c"># Ignore leftover samples. Who cares...</span>
+                <span class="k">yield</span> <span class="n">Unit</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="n">audio</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">unit_length</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="AudioSegmenter.mark_audio"><a class="viewcode-back" href="../../index.html#hmosaic.segment.AudioSegmenter.mark_audio">[docs]</a>    <span class="k">def</span> <span class="nf">mark_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">SegmentAudio</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">onsets_all</span> <span class="o">=</span> <span class="n">get_fixed_onsets</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">,</span> <span class="n">audio</span><span class="o">.</span><span class="n">length</span><span class="o">*</span><span class="mi">1000</span><span class="p">)</span>
+        <span class="k">print</span> <span class="s">&quot;Onsets are </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">onsets_all</span>
+        <span class="n">marker</span> <span class="o">=</span> <span class="n">AudioOnsetsMarker</span><span class="p">(</span><span class="n">onsets</span> <span class="o">=</span> <span class="n">onsets_all</span><span class="p">,</span> <span class="nb">type</span> <span class="o">=</span> <span class="s">&#39;beep&#39;</span><span class="p">)</span>
+        <span class="n">marked_audio</span> <span class="o">=</span> <span class="n">marker</span><span class="p">(</span><span class="n">audio</span><span class="o">.</span><span class="n">audio_array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;single&#39;</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">marked_audio</span>
+                
+</div></div>
+<div class="viewcode-block" id="NoteOnsetSegmenter"><a class="viewcode-back" href="../../index.html#hmosaic.segment.NoteOnsetSegmenter">[docs]</a><span class="k">class</span> <span class="nc">NoteOnsetSegmenter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This is a pure essentia segmenter.</span>
+<span class="sd">        I have found that hfc and rms give better result so </span>
+<span class="sd">        that&#39;s why the defaults are as they are. Weights are </span>
+<span class="sd">        evaluated as 1. complex, 2. hfc, 3. rms</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">defaults</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;rms&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s">&#39;complex&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s">&#39;hfc&#39;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s">&#39;flux&#39;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sr</span> <span class="o">=</span> <span class="mi">44100</span><span class="p">,</span> <span class="n">frame_size</span><span class="o">=</span><span class="mi">4096</span><span class="p">,</span> <span class="n">hop_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span>
+        <span class="n">onset_weights</span><span class="o">=</span><span class="n">defaults</span><span class="p">,</span> <span class="n">filter_audio</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">aubio</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">fixedlength</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sr</span> <span class="o">=</span> <span class="mi">44100</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span> <span class="o">=</span> <span class="n">frame_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hop_size</span> <span class="o">=</span> <span class="n">hop_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span> <span class="o">=</span> <span class="n">onset_weights</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filter_audio</span><span class="o">=</span><span class="n">filter_audio</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span> <span class="o">=</span> <span class="n">aubio</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aubio_length</span> <span class="o">=</span> <span class="mf">0.2</span>
+    
+<div class="viewcode-block" id="NoteOnsetSegmenter.set_weights"><a class="viewcode-back" href="../../index.html#hmosaic.segment.NoteOnsetSegmenter.set_weights">[docs]</a>    <span class="k">def</span> <span class="nf">set_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Expects weights to be a valid onset_weights dictionary</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span> <span class="o">=</span> <span class="n">weights</span>   
+        </div>
+<div class="viewcode-block" id="NoteOnsetSegmenter.segment"><a class="viewcode-back" href="../../index.html#hmosaic.segment.NoteOnsetSegmenter.segment">[docs]</a>    <span class="k">def</span> <span class="nf">segment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span><span class="p">:</span>
+            <span class="n">onsets_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aubio_onsets</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">audio</span> <span class="o">=</span> <span class="n">MonoLoader</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">filepath</span><span class="p">)()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pool</span><span class="p">,</span> <span class="n">audio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_analyse</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>        
+            <span class="n">onsets_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_weights</span><span class="p">(</span><span class="n">pool</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">onset</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">onsets_all</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">prev_onset</span> <span class="o">=</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">print</span> <span class="s">&quot;Previous onset is: </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">prev_onset</span>
+                <span class="k">print</span> <span class="s">&quot;Current Onset is: </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">)</span>
+                <span class="n">samps</span> <span class="o">=</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">)</span> <span class="o">-</span> <span class="n">prev_onset</span>
+                <span class="k">yield</span> <span class="n">Unit</span><span class="p">(</span><span class="n">audio</span><span class="p">[</span><span class="n">prev_onset</span><span class="p">:</span><span class="n">prev_onset</span><span class="o">+</span><span class="n">samps</span><span class="p">],</span>\
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">,</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">samps</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">)))</span>
+            <span class="n">prev_onset</span> <span class="o">=</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="n">onset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sr</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="NoteOnsetSegmenter.mark_audio"><a class="viewcode-back" href="../../index.html#hmosaic.segment.NoteOnsetSegmenter.mark_audio">[docs]</a>    <span class="k">def</span> <span class="nf">mark_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span><span class="p">:</span>
+            <span class="n">onsets_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aubio_onsets</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">audio</span> <span class="o">=</span> <span class="n">MonoLoader</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">filepath</span><span class="p">)()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">pool</span><span class="p">,</span> <span class="n">audio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_analyse</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">onsets_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_weights</span><span class="p">(</span><span class="n">pool</span><span class="p">)</span>
+        <span class="k">print</span> <span class="s">&quot;Onsets are </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">onsets_all</span>
+        <span class="n">marker</span> <span class="o">=</span> <span class="n">AudioOnsetsMarker</span><span class="p">(</span><span class="n">onsets</span> <span class="o">=</span> <span class="n">onsets_all</span><span class="p">,</span> <span class="nb">type</span> <span class="o">=</span> <span class="s">&#39;beep&#39;</span><span class="p">)</span>
+        <span class="n">marked_audio</span> <span class="o">=</span> <span class="n">marker</span><span class="p">(</span><span class="n">audio</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">marked_audio</span>
+
+</div>
+    <span class="k">def</span> <span class="nf">_convert_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pool</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">onset_type</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">onset_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="k">print</span> <span class="s">&quot;Onset type is: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">onset_type</span>
+                <span class="k">print</span> <span class="n">pool</span><span class="p">[</span><span class="n">onset_type</span><span class="p">]</span>
+                <span class="k">print</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">[</span><span class="n">onset_type</span><span class="p">]</span>
+        <span class="n">onset_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">pool</span><span class="p">[</span><span class="n">onset_type</span><span class="p">]</span> <span class="k">for</span> <span class="n">onset_type</span> <span class="ow">in</span> <span class="n">pool</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">()</span> \
+            <span class="k">if</span> <span class="n">onset_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="o">.</span><span class="n">keys</span><span class="p">()]</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">[</span><span class="n">onset_type</span><span class="p">]</span> <span class="k">for</span> <span class="n">onset_type</span> <span class="ow">in</span> \
+            <span class="n">pool</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">()</span> <span class="k">if</span> <span class="n">onset_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="o">.</span><span class="n">keys</span><span class="p">()]</span>
+        
+        <span class="n">onsets</span> <span class="o">=</span> <span class="n">Onsets</span><span class="p">()</span>
+        <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Calculating onsets using these weights &#39;</span><span class="si">%s</span><span class="s">&#39; &quot;</span> <span class="o">%</span> <span class="n">weights</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">onsets</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">onset_list</span><span class="p">),</span> <span class="n">weights</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_analyse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">to_mono</span><span class="p">(</span><span class="n">wavread</span><span class="p">(</span><span class="n">filepath</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">audio</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;float32&#39;</span><span class="p">)</span>
+        
+        <span class="n">w</span> <span class="o">=</span> <span class="n">Windowing</span><span class="p">(</span><span class="nb">type</span> <span class="o">=</span> <span class="s">&#39;hann&#39;</span><span class="p">)</span>
+        <span class="n">fft</span> <span class="o">=</span> <span class="n">FFT</span><span class="p">()</span> <span class="c"># this gives us a complex FFT</span>
+        <span class="n">c2p</span> <span class="o">=</span> <span class="n">CartesianToPolar</span><span class="p">()</span> <span class="c"># and this turns it into a pair (magnitude, phase)</span>
+        <span class="n">hfc_detect</span> <span class="o">=</span> <span class="n">OnsetDetection</span><span class="p">(</span><span class="n">method</span> <span class="o">=</span> <span class="s">&#39;hfc&#39;</span><span class="p">)</span>
+        <span class="n">complex_detect</span> <span class="o">=</span> <span class="n">OnsetDetection</span><span class="p">(</span><span class="n">method</span> <span class="o">=</span> <span class="s">&#39;complex&#39;</span><span class="p">)</span>
+        <span class="n">rms_detect</span> <span class="o">=</span> <span class="n">RMS</span><span class="p">()</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="n">Spectrum</span><span class="p">()</span>
+        <span class="c">#pd = PitchDetection()</span>
+        <span class="n">flux</span> <span class="o">=</span> <span class="n">Flux</span><span class="p">()</span>
+        <span class="n">pool</span> <span class="o">=</span> <span class="n">Pool</span><span class="p">()</span>
+        <span class="c">#wap = WarpedAutoCorrelation()</span>
+        
+    
+        <span class="c"># let&#39;s get down to business</span>
+        <span class="k">print</span> <span class="s">&#39;Computing onset detection functions...&#39;</span>
+        <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">FrameGenerator</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">frameSize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">frame_size</span><span class="p">,</span>\
+            <span class="n">hopSize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hop_size</span><span class="p">):</span>
+            <span class="n">mag</span><span class="p">,</span> <span class="n">phase</span><span class="p">,</span> <span class="o">=</span> <span class="n">c2p</span><span class="p">(</span><span class="n">fft</span><span class="p">(</span><span class="n">w</span><span class="p">(</span><span class="n">frame</span><span class="p">)))</span>
+            <span class="n">spectrum</span> <span class="o">=</span> <span class="n">spec</span><span class="p">(</span><span class="n">w</span><span class="p">(</span><span class="n">frame</span><span class="p">))</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">flux</span><span class="p">(</span><span class="n">spectrum</span><span class="p">)</span>
+            <span class="c">#pitch = pd(spectrum)</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;hfc&#39;</span><span class="p">,</span> <span class="n">hfc_detect</span><span class="p">(</span><span class="n">mag</span><span class="p">,</span> <span class="n">phase</span><span class="p">))</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;complex&#39;</span><span class="p">,</span> <span class="n">complex_detect</span><span class="p">(</span><span class="n">mag</span><span class="p">,</span> <span class="n">phase</span><span class="p">))</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;rms&#39;</span><span class="p">,</span> <span class="n">rms_detect</span><span class="p">(</span><span class="n">frame</span><span class="p">))</span>
+            <span class="n">pool</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s">&#39;flux&#39;</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="c">#pool.add(&#39;pitch&#39;, pitch[0])</span>
+        <span class="c">#print pool[&#39;pitch&#39;]</span>
+        <span class="c">#pool.add(&#39;autoc&#39;, wap(pool[&#39;pitch&#39;]))</span>
+     
+
+        <span class="k">return</span> <span class="n">pool</span><span class="p">,</span> <span class="n">audio</span>
+
+    <span class="k">def</span> <span class="nf">_aubio_onsets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Uses the aubionotes command line utility to do note segmentation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;aubionotes&#39;</span><span class="p">,</span><span class="s">&#39;-i&#39;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;-t&#39;</span><span class="p">,</span> <span class="s">&#39;0.9&#39;</span> <span class="p">]</span>
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> \
+        <span class="n">stderr</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span><span class="p">)</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+        
+        <span class="c"># Don&#39;t know what happpens when this yoke throws an error</span>
+        <span class="k">print</span> <span class="n">stdout</span>
+        <span class="k">print</span> <span class="nb">len</span><span class="p">(</span><span class="n">stdout</span><span class="p">)</span>
+        <span class="n">numbers</span> <span class="o">=</span> <span class="n">stdout</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">)</span>
+        <span class="n">onsets</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">prev_note</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">skipped</span><span class="o">=</span><span class="bp">False</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">numbers</span><span class="p">:</span>
+            <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Is this A NUMBER? :</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span><span class="n">n</span><span class="p">)</span>
+            <span class="n">no_list</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">no_list</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="k">print</span> <span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">prev_note</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">onsets</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+                    <span class="n">prev_note</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="k">if</span> <span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="n">prev_note</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio_length</span><span class="p">:</span>
+                    <span class="k">print</span><span class="p">(</span><span class="s">&quot;Note is too small, lets merge.&quot;</span><span class="p">)</span>
+                    <span class="c">#prev_note = float(no_list[1])</span>
+                    <span class="c">#onsets.add(float(no_list[1]))</span>
+                    <span class="n">skipped</span> <span class="o">=</span>  <span class="bp">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">print</span> <span class="p">(</span><span class="s">&quot;This is data I can use!!: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">no_list</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">skipped</span><span class="p">:</span>
+                        <span class="n">onsets</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+                    <span class="n">onsets</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+                    <span class="n">skipped</span><span class="o">=</span><span class="bp">False</span>
+                    <span class="n">prev_note</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">no_list</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+        <span class="n">onset_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">onsets</span><span class="p">)</span>
+        <span class="n">onset_list</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+        <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Onsets are: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">onset_list</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">onset_list</span>
+
+    <span class="k">def</span> <span class="nf">write_aubio_onsets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">onset_list</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Onsets are :</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">onset_list</span><span class="p">)</span>
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">MonoLoader</span><span class="p">(</span><span class="n">filename</span><span class="o">=</span><span class="n">filepath</span><span class="p">)()</span>
+        <span class="n">marker</span> <span class="o">=</span> <span class="n">AudioOnsetsMarker</span><span class="p">(</span><span class="n">onsets</span> <span class="o">=</span> <span class="n">onset_list</span><span class="p">,</span> <span class="nb">type</span> <span class="o">=</span> <span class="s">&#39;beep&#39;</span><span class="p">)</span>
+        <span class="n">marked_audio</span> <span class="o">=</span> <span class="n">marker</span><span class="p">(</span><span class="n">audio</span><span class="p">)</span>
+        <span class="n">wavwrite</span><span class="p">(</span><span class="n">marked_audio</span><span class="p">,</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">),</span> \
+            <span class="s">&#39;AUBIOONSETS.wav&#39;</span><span class="p">),</span> <span class="mi">44100</span><span class="p">)</span>
+    
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

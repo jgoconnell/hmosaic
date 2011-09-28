@@ -1,0 +1,11 @@
+#N canvas 0 0 1351 705 10;
+#X obj 1 9 hl_control;
+#X obj 253 9 hl_target;
+#X obj 254 211 hl_mosaic;
+#X obj 4 211 ll_descriptors;
+#X obj 4 453 hl_similarity;
+#X obj 255 412 hl_segment_control;
+#X obj 726 410 corpus_control;
+#X obj 605 9 ll_settings;
+#X obj 535 211 hl_labels;
+#X obj 725 8 hl_sequencer_row;

@@ -1,0 +1,788 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.corpus &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.corpus</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Contains all code related to database and file management aspects</span>
+<span class="sd">Gaia similarity search is also encapsulated in here. .</span>
+<span class="sd">Base classes are defined and a file based database management system is</span>
+<span class="sd">implemented.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">shutil</span><span class="o">,</span> <span class="nn">re</span><span class="o">,</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+
+<span class="c"># Third party library imports</span>
+<span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">wavread</span><span class="p">,</span> <span class="n">wavwrite</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+
+<span class="c"># hmosaic package imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">to_mono</span><span class="p">,</span> <span class="n">switch_ext</span><span class="p">,</span> <span class="n">get_directories</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">get_files_recursive</span><span class="p">,</span> <span class="n">wav_timestamp</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">most_recent_first</span>
+<span class="kn">from</span> <span class="nn">hmosaic.segment</span> <span class="kn">import</span> <span class="n">NoteOnsetSegmenter</span><span class="p">,</span> <span class="n">AudioSegmenter</span>
+<span class="kn">from</span> <span class="nn">hmosaic.settings</span> <span class="kn">import</span> <span class="n">SOURCE_REPO</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">segment_corpus</span><span class="p">,</span> <span class="n">analyse_corpus</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">convertAudio</span> <span class="k">as</span> <span class="n">ca</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># ABSTRACT CORPUS RELATED BASE CLASSES</span>
+<span class="c">###############################################################################</span>
+
+<div class="viewcode-block" id="CorpusManager"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusManager">[docs]</a><span class="k">class</span> <span class="nc">CorpusManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract base class for a CorpusManager.</span>
+<span class="sd">        A corpus manager knows about all existing corpuses.</span>
+<span class="sd">        It can create and delete corpuses, list all the available</span>
+<span class="sd">        corpuses and return a corpus instance.</span>
+<span class="sd">        This base class has been kept very abstract so as to allow</span>
+<span class="sd">        maximum flexibility. All of the below methods ought to be implemented</span>
+<span class="sd">        in a subclass, so as to allow modularity and interchangeable components.</span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Initialsise the manager. &quot;&quot;&quot;</span>
+        
+        <span class="k">pass</span>
+       
+        
+<div class="viewcode-block" id="CorpusManager.list_corpuses"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusManager.list_corpuses">[docs]</a>    <span class="k">def</span> <span class="nf">list_corpuses</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns a list of available corpuses. &quot;&quot;&quot;</span>
+        
+        <span class="k">pass</span>
+        
+    
+        </div>
+<div class="viewcode-block" id="CorpusManager.create_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusManager.create_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">create_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Creates a corpus. &quot;&quot;&quot;</span>
+        
+        <span class="k">pass</span>
+    
+        </div>
+<div class="viewcode-block" id="CorpusManager.load_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusManager.load_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">load_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Returns an instance of the corpus indicated by corpus_name. &quot;&quot;&quot;</span>
+        
+        <span class="k">pass</span>
+        </div>
+<div class="viewcode-block" id="CorpusManager.delete_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusManager.delete_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">delete_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Deletes the corpus indicated by corpus_name!!! &quot;&quot;&quot;</span>
+        
+        <span class="k">pass</span>
+    </div></div>
+<div class="viewcode-block" id="Corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus">[docs]</a><span class="k">class</span> <span class="nc">Corpus</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">       This is a corpus, it can yield units based on supplied constraints.</span>
+<span class="sd">       This base class has been kept very abstract so as to allow</span>
+<span class="sd">       maximum flexibility. All of the below methods ought to be implemented</span>
+<span class="sd">       in a subclass, so as to allow modularity and interchangeable components.</span>
+<span class="sd">       </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Initialiser for the base class.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+    
+<div class="viewcode-block" id="Corpus.list_audio_files"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus.list_audio_files">[docs]</a>    <span class="k">def</span> <span class="nf">list_audio_files</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns filepaths for all audio files. The criteria for which units to </span>
+<span class="sd">            select would be implemented by overriding this function.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+        </div>
+<div class="viewcode-block" id="Corpus.list_audio_units"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus.list_audio_units">[docs]</a>    <span class="k">def</span> <span class="nf">list_audio_units</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns filepaths for all units. The criteria for which units to </span>
+<span class="sd">            select would be implemented by overriding this function.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+    </div>
+<div class="viewcode-block" id="Corpus.store_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus.store_audio">[docs]</a>    <span class="k">def</span> <span class="nf">store_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Provides a means to add audio to the corpus ...</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        </div>
+<div class="viewcode-block" id="Corpus.segment_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus.segment_audio">[docs]</a>    <span class="k">def</span> <span class="nf">segment_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Segments the audio into units. This function may instantiate</span>
+<span class="sd">            an object from  ``hmosaic.segment`` to take care of </span>
+<span class="sd">            the segmentation details.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        </div>
+<div class="viewcode-block" id="Corpus.save_marked_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.Corpus.save_marked_audio">[docs]</a>    <span class="k">def</span> <span class="nf">save_marked_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns the audio file requested.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+   
+    
+  
+<span class="c">###############################################################################</span>
+<span class="c"># CORPUS EXCEPTIONS</span>
+<span class="c">###############################################################################</span>
+</div></div>
+<div class="viewcode-block" id="CorpusDoesNotExistException"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusDoesNotExistException">[docs]</a><span class="k">class</span> <span class="nc">CorpusDoesNotExistException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Thrown when loading or deleting a corpus which does not exist. &quot;&quot;&quot;</span>
+    
+    <span class="k">pass</span>
+    </div>
+<div class="viewcode-block" id="CorpusExistsException"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.CorpusExistsException">[docs]</a><span class="k">class</span> <span class="nc">CorpusExistsException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Thrown when attempting to create a corpus which already exists. &quot;&quot;&quot;</span>
+    
+    <span class="k">pass</span>  
+</div>
+<div class="viewcode-block" id="FileExistsException"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileExistsException">[docs]</a><span class="k">class</span> <span class="nc">FileExistsException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Thrown when the file already exists in the corpus. &quot;&quot;&quot;</span>
+    
+    <span class="k">pass</span>
+</div>
+<div class="viewcode-block" id="FileNotFoundException"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileNotFoundException">[docs]</a><span class="k">class</span> <span class="nc">FileNotFoundException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; Thrown when a file cannot be found. &quot;&quot;&quot;</span>
+    
+    <span class="k">pass</span>
+    
+<span class="c">###############################################################################</span>
+<span class="c"># PROJECT IMPLEMENTATIONS OF BASE CLASSES</span>
+<span class="c">###############################################################################</span>
+</div>
+<div class="viewcode-block" id="FileCorpusManager"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpusManager">[docs]</a><span class="k">class</span> <span class="nc">FileCorpusManager</span><span class="p">(</span><span class="n">CorpusManager</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            For now keep corpus discovery simple. </span>
+<span class="sd">            A corpus is just a directory indicated by filepaths</span>
+<span class="sd">            It contains subdirectories filled with wav files, which</span>
+<span class="sd">            contain the audio and json files which contain the analysis.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">repository</span> <span class="o">=</span> <span class="n">filepath</span>
+    
+<div class="viewcode-block" id="FileCorpusManager.list_corpuses"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpusManager.list_corpuses">[docs]</a>    <span class="k">def</span> <span class="nf">list_corpuses</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            All the subdirectories in self.repository are assumed</span>
+<span class="sd">            to be file corpuses.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">filter</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">,</span> <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span><span class="s">&#39;*&#39;</span><span class="p">)))</span>
+        </div>
+<div class="viewcode-block" id="FileCorpusManager.create_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpusManager.create_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">create_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">            Creates an empty corpus by creating a directory </span>
+<span class="sd">            in the repository.</span>
+<span class="sd">            Raises an exception if the corpus of that name already exists.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>        
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="n">CorpusExistsException</span><span class="p">(</span><span class="s">&quot;Corpus already exists!!&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">))</span>
+    
+   
+        </div>
+<div class="viewcode-block" id="FileCorpusManager.load_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpusManager.load_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">load_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Raises an exception if the corpus indicated by corpus_name</span>
+<span class="sd">            doesn&#39;t exist. Returns an instance of a FileCorpus otherwise.</span>
+<span class="sd">        </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">corpus_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">corpus_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">CorpusDoesNotExistException</span><span class="p">(</span><span class="s">&quot;This corpus doesn&#39;t exist: </span><span class="si">%s</span><span class="s">&quot;</span>\
+                <span class="o">%</span> <span class="n">corpus_path</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">FileCorpus</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">))</span>
+        </div>
+<div class="viewcode-block" id="FileCorpusManager.delete_corpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpusManager.delete_corpus">[docs]</a>    <span class="k">def</span> <span class="nf">delete_corpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Will delete the corpus!!! Returns True upon successful deletion,</span>
+<span class="sd">            False otherwise</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">corpus_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="n">corpus_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">corpus_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">CorpusDoesNotExistException</span><span class="p">(</span><span class="s">&quot;This corpus doesn&#39;t exist: </span><span class="si">%s</span><span class="s">&quot;</span>\
+                <span class="o">%</span> <span class="n">corpus_path</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">corpus_path</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">True</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="s">&quot;Something went wrong deleting the corpus: </span><span class="si">%s</span><span class="s">: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                    <span class="o">%</span> <span class="p">(</span><span class="n">corpus_path</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="bp">False</span>
+                </div></div>
+<div class="viewcode-block" id="FileCorpus"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus">[docs]</a><span class="k">class</span> <span class="nc">FileCorpus</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">       This is a corpus, it can yield units based on supplied constraints.</span>
+<span class="sd">       All analysis is stored as a yaml file and is produced by Essentia.</span>
+<span class="sd">       Whole files can be analysed using high level analysis, while units</span>
+<span class="sd">       are analysed using a stripped down version of the analysis as it is </span>
+<span class="sd">       much faster.</span>
+<span class="sd">       Gaia is used to build DataSets of the analysed units. Each </span>
+<span class="sd">       segmentation of the source audio file (e.g. based on detected onsets or</span>
+<span class="sd">       using a fix length chop size for segmentation like 500 ms,1000 ms,etc.)</span>
+<span class="sd">       It is recommended to keep these Datasets relatively small </span>
+<span class="sd">       e.g. 15000 units.</span>
+<span class="sd">       Performance issues have been encountered using larger DataSets </span>
+<span class="sd">       (&gt; 30000 units)</span>
+<span class="sd">       A file corpus looks like this</span>
+<span class="sd">            </span>
+<span class="sd">            corpus_name</span>
+<span class="sd">                ---&gt; unit_ds_onsets.db</span>
+<span class="sd">                ---&gt; unit_ds_500.db</span>
+<span class="sd">                ---&gt; unit_ds_1000.db</span>
+<span class="sd">                ---&gt; audio1.wav</span>
+<span class="sd">                ---&gt; audio1.yaml</span>
+<span class="sd">                ---&gt; audio1</span>
+<span class="sd">                    ---&gt; 500</span>
+<span class="sd">                        ---&gt; 1.wav</span>
+<span class="sd">                        ---&gt; 2.wav</span>
+<span class="sd">                        ---&gt; 3.wav</span>
+<span class="sd">                    ---&gt; 1000</span>
+<span class="sd">                        ---&gt; 1.wav</span>
+<span class="sd">                    ---&gt; onsets</span>
+<span class="sd">                        ---&gt; 1_0.wav</span>
+<span class="sd">                        ---&gt; 1_0.yaml</span>
+<span class="sd">                        ---&gt; 2_1.wav</span>
+<span class="sd">                        ---&gt; 2_1.yaml</span>
+<span class="sd">                        ---&gt; 3_1.wav</span>
+<span class="sd">                        ---&gt; 3_1.yaml</span>
+<span class="sd">                        ---&gt; 4_2.wav</span>
+<span class="sd">                        ---&gt; 4_2.yaml</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+<span class="c">###############################################################################</span>
+<span class="c"># INITIALISER</span>
+<span class="c">###############################################################################</span>
+    
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Initialises itself to the filepath. This is where all the audio</span>
+<span class="sd">           and analysis is.</span>
+<span class="sd">           </span>
+<span class="sd">           </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">location</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="c"># hardcoded aubio length for now.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aubio_length</span> <span class="o">=</span> <span class="mf">0.2</span>
+                              
+<span class="c">###############################################################################</span>
+<span class="c"># FILESYSTEM RELATED FUNCTIONS - STORAGE, MANAGEMENT AND RETRIEVAL OF AUDIO</span>
+<span class="c">###############################################################################</span>
+    
+<div class="viewcode-block" id="FileCorpus.store_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.store_audio">[docs]</a>    <span class="k">def</span> <span class="nf">store_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_filepath</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Adds audio to the corpus. If ``filename`` is supplied, then the</span>
+<span class="sd">            source audio is added to the corpus using that filename. Otherwise</span>
+<span class="sd">            the basename of ``audio_filepath`` is used.</span>
+<span class="sd">            Source files must be unique in the corpus, so an exception is raised</span>
+<span class="sd">            if this name already exists. The file is then converted to </span>
+<span class="sd">            monophonic, 44.1 kHz wav format before being stored in the corpus.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">filename</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="n">file_dest</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> \
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">file_dest</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span><span class="n">filename</span><span class="p">)</span>
+            
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">file_dest</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">FileExistsException</span><span class="p">(</span><span class="s">&quot;File: </span><span class="si">%s</span><span class="s">&#39; is already in the db: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+                <span class="o">%</span> <span class="p">(</span><span class="n">file_dest</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">))</span>
+                
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Processing &#39;</span><span class="si">%s</span><span class="s">&#39; prior to adding to corpus&quot;</span> <span class="o">%</span> <span class="n">audio_filepath</span><span class="p">)</span>
+        <span class="n">audio_array</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_file</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">)</span>
+        <span class="n">wavwrite</span><span class="p">(</span><span class="n">audio_array</span><span class="p">,</span> <span class="n">file_dest</span><span class="p">,</span> <span class="mi">44100</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot; &#39;</span><span class="si">%s</span><span class="s">&#39; stored in corpus, returning new path: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="n">audio_filepath</span><span class="p">,</span> <span class="n">file_dest</span><span class="p">))</span>
+    
+        <span class="c"># Return the full path to the file in the corpus.</span>
+        <span class="k">return</span> <span class="n">file_dest</span>
+
+        </div>
+<div class="viewcode-block" id="FileCorpus.delete_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.delete_audio">[docs]</a>    <span class="k">def</span> <span class="nf">delete_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Deletes the given audio at ``filename`` and all it&#39;s associated </span>
+<span class="sd">            units. ``filename`` can be the basename of the audio in the corpus</span>
+<span class="sd">            or the full filepath to the audio in the corpus.</span>
+<span class="sd">            </span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_exists</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">FileNotFoundException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Could not find &#39;</span><span class="si">%s</span><span class="s">&#39; in the source corpus: &#39;</span><span class="si">%s</span><span class="s">&#39;. Doing nothing.&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Removed &#39;</span><span class="si">%s</span><span class="s">&#39; from corpus&quot;</span> <span class="o">%</span> <span class="n">filename</span><span class="p">)</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Removed all units for &#39;</span><span class="si">%s</span><span class="s">&#39; from corpus&quot;</span> <span class="o">%</span> <span class="n">filename</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="FileCorpus.list_audio_files"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.list_audio_files">[docs]</a>    <span class="k">def</span> <span class="nf">list_audio_files</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Lists those audio files all audio files in the corpus.</span>
+<span class="sd">           1 big assumption: Audio files are *.wav always!!</span>
+<span class="sd">           </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">wildcard</span> <span class="o">=</span> <span class="s">&#39;*.wav&#39;</span>      
+        <span class="k">return</span> <span class="nb">filter</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">,</span> \
+            <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">wildcard</span><span class="p">)))</span>
+
+    </div>
+<div class="viewcode-block" id="FileCorpus.list_audio_units"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.list_audio_units">[docs]</a>    <span class="k">def</span> <span class="nf">list_audio_units</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_filename</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Return full filepaths for all units</span>
+<span class="sd">        &quot;&quot;&quot;</span>        
+         
+        
+        <span class="k">if</span> <span class="n">audio_filename</span><span class="p">:</span>
+            <span class="n">audio_dir</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">audio_filename</span><span class="p">,</span> <span class="s">&#39;&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_segment_exists</span><span class="p">(</span><span class="n">audio_dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">chop</span><span class="p">:</span>
+                <span class="k">print</span> <span class="s">&quot;Chop dir has been specified: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">chop</span>
+                <span class="n">chop_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">audio_dir</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">chop</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_check_segment_exists</span><span class="p">(</span><span class="n">chop_dir</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">get_files_recursive</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">chop_dir</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+               <span class="k">return</span> <span class="n">get_files_recursive</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">audio_dir</span><span class="p">))</span> <span class="c"># Write a function to do this.                  </span>
+        <span class="k">else</span><span class="p">:</span> 
+            <span class="n">filepaths</span> <span class="o">=</span> <span class="p">[]</span>
+            
+            <span class="k">if</span> <span class="n">chop</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">audio_dir</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list_segments</span><span class="p">():</span>
+                    <span class="k">for</span> <span class="n">chop_dir</span> <span class="ow">in</span> <span class="n">get_directories</span><span class="p">(</span><span class="n">audio_dir</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">chop_dir</span><span class="p">)</span> <span class="o">==</span> <span class="nb">str</span><span class="p">(</span><span class="n">chop</span><span class="p">):</span>
+                            <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">get_files_recursive</span><span class="p">(</span><span class="n">chop_dir</span><span class="p">):</span>
+                                <span class="n">filepaths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">audio_dir</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list_segments</span><span class="p">():</span>
+                    <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">get_files_recursive</span><span class="p">(</span><span class="n">audio_dir</span><span class="p">):</span>
+                        <span class="n">filepaths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+               
+            <span class="n">filepaths</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>         
+            <span class="k">return</span> <span class="n">filepaths</span>
+            
+       </div>
+<div class="viewcode-block" id="FileCorpus.get_filepath"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.get_filepath">[docs]</a>    <span class="k">def</span> <span class="nf">get_filepath</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Given the name of a file, ``filename`` which was added to the </span>
+<span class="sd">            corpus, this function returns the full filepath of the file inside</span>
+<span class="sd">            the corpus or **None** if ``filename`` cannot be found.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">filepath</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">None</span>
+            </div>
+<div class="viewcode-block" id="FileCorpus.search_audio_files"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.search_audio_files">[docs]</a>    <span class="k">def</span> <span class="nf">search_audio_files</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">pattern</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Accepts a regular expression and returns those filenames</span>
+<span class="sd">            which match.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">re_pat</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">filter</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">audio</span><span class="p">:</span> <span class="n">audio</span> <span class="k">if</span> \
+            <span class="n">re_pat</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">audio</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span> <span class="k">else</span> \
+                <span class="s">&#39;no match&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">()))</span>
+</div>
+<div class="viewcode-block" id="FileCorpus.get_most_recent"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.get_most_recent">[docs]</a>    <span class="k">def</span> <span class="nf">get_most_recent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Gets the most recently created segment and returns</span>
+<span class="sd">           the corresponding audio file. This can be used to set</span>
+<span class="sd">           the most recently target - useful for testing!</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">segs</span> <span class="o">=</span> <span class="n">most_recent_first</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_list_segments</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">segs</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s">&#39;.wav&#39;</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="FileCorpus.store_info"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.store_info">[docs]</a>    <span class="k">def</span> <span class="nf">store_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">info_dict</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Stores information in the `info_dict` to disk at location </span>
+<span class="sd">            indicated by filename.</span>
+<span class="sd"> </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Trying to save info dictionary to </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">filename</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s">&#39;w&#39;</span><span class="p">)</span>
+            <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">info_dict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Something went wrong tryin to write &#39;</span><span class="si">%s</span><span class="s">&#39; to &#39;</span><span class="si">%s</span><span class="s">&#39;: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">info_dict</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+       
+          
+<span class="c">###############################################################################</span>
+<span class="c"># SEGMENTATION RELATED FUNCTIONS - MARKING ONSETS, CREATING UNITS</span>
+<span class="c">###############################################################################          </span>
+  </div>
+<div class="viewcode-block" id="FileCorpus.segment_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.segment_audio">[docs]</a>    <span class="k">def</span> <span class="nf">segment_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">hop</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">onset_weights</span><span class="o">=</span><span class="p">{},</span> <span class="n">aubio</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Takes an audio file and segments it according to the chop value</span>
+<span class="sd">            (milliseconds).</span>
+<span class="sd">            A subfolder is created, same name as the audio file, inside this</span>
+<span class="sd">            folder, we have another folder with the chop time and the units </span>
+<span class="sd">            are held in there.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+            
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_exists</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">:</span>
+            <span class="n">FileNotFoundException</span><span class="p">(</span><span class="s">&quot;Audio: &#39;</span><span class="si">%s</span><span class="s">&#39; is not in the corpus: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                <span class="o">%</span> <span class="p">(</span><span class="n">audio_filepath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">))</span>
+        <span class="n">segments_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_segments_dir</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">,</span> <span class="n">chop</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">chop</span> <span class="o">==</span> <span class="s">&#39;onsets&#39;</span><span class="p">:</span>
+            <span class="n">segmenter</span> <span class="o">=</span> <span class="n">NoteOnsetSegmenter</span><span class="p">(</span><span class="n">aubio</span><span class="o">=</span><span class="n">aubio</span><span class="p">)</span>
+            <span class="n">segmenter</span><span class="o">.</span><span class="n">aubio_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio_length</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">onset_weights</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">segmenter</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="n">onset_weights</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">segmenter</span> <span class="o">=</span> <span class="n">AudioSegmenter</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">,</span> <span class="n">hop</span><span class="o">=</span><span class="n">hop</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">unit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">segmenter</span><span class="o">.</span><span class="n">segment</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">)):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Length of unit is: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">unit</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">segments_dir</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%07d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">index</span><span class="p">))</span>
+            <span class="n">wavwrite</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">unit</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Successfully written &#39;</span><span class="si">%07d</span><span class="s">.wav&#39; to &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> 
+                <span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">segments_dir</span><span class="p">)</span> <span class="p">)</span>
+                
+</div>
+<div class="viewcode-block" id="FileCorpus.save_marked_audio"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.save_marked_audio">[docs]</a>    <span class="k">def</span> <span class="nf">save_marked_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">onset_weights</span><span class="o">=</span><span class="p">{},</span> <span class="n">aubio</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Looks for a name - which should be in the db and</span>
+<span class="sd">            marks the current onsets and saves the file to the corpus.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_filepath</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">chop</span> <span class="ow">and</span> <span class="n">chop</span> <span class="o">!=</span> <span class="s">&#39;onsets&#39;</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Calculating fixed onsets&quot;</span><span class="p">)</span>
+            <span class="n">segmenter</span> <span class="o">=</span> <span class="n">AudioSegmenter</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">)</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s">&#39;FIXEDONSETS&#39;</span>
+        <span class="k">elif</span> <span class="n">aubio</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Calculating Aubio onsets&quot;</span><span class="p">)</span>
+            <span class="n">segmenter</span> <span class="o">=</span> <span class="n">NoteOnsetSegmenter</span><span class="p">(</span><span class="n">aubio</span><span class="o">=</span><span class="n">aubio</span><span class="p">)</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s">&#39;AUBIOONSETS&#39;</span>
+            <span class="n">segmenter</span><span class="o">.</span><span class="n">aubio_length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio_length</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Calculating Essentia onsets&quot;</span><span class="p">)</span>
+            <span class="n">segmenter</span> <span class="o">=</span> <span class="n">NoteOnsetSegmenter</span><span class="p">()</span>
+            <span class="n">suffix</span> <span class="o">=</span> <span class="s">&#39;ESSENTIAONSETS&#39;</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">onset_weights</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">segmenter</span><span class="o">.</span><span class="n">set_weights</span><span class="p">(</span><span class="n">onset_weights</span><span class="p">)</span>
+
+        
+        <span class="n">audio</span> <span class="o">=</span> <span class="n">segmenter</span><span class="o">.</span><span class="n">mark_audio</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">audio_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">wav_timestamp</span><span class="p">(</span><span class="n">filename</span><span class="o">+</span><span class="n">suffix</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Saving marked audio to </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">audio_name</span><span class="p">)</span>
+        <span class="n">wavwrite</span><span class="p">(</span><span class="n">audio</span><span class="p">,</span> <span class="n">audio_name</span><span class="p">,</span> <span class="mi">44100</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">audio_name</span>
+  
+<span class="c">###############################################################################</span>
+<span class="c"># FUNCTIONS TO CREATE AND RETURN GAIA DATASETS FOR SIMILARITY SEARCH IN CORPUS</span>
+<span class="c">###############################################################################      </span>
+    </div>
+<div class="viewcode-block" id="FileCorpus.create_gaia_db"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.create_gaia_db">[docs]</a>    <span class="k">def</span> <span class="nf">create_gaia_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;onsets&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Creates Gaia datasets for all units of the given ``chop`` segmentation</span>
+<span class="sd">            scheme from all the .yaml files produced by the essentia analysis. </span>
+<span class="sd">          </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">DataSet</span><span class="p">,</span> <span class="n">transform</span>
+        <span class="n">sig_files</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> \
+            <span class="p">[</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">)])</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found </span><span class="si">%d</span><span class="s"> units for the given segmentation scheme: </span><span class="si">%s</span><span class="s">&quot;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">sig_files</span><span class="p">),</span> <span class="n">chop</span><span class="p">)</span> 
+        <span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Populating dictionaries of units and full files respectively&quot;</span><span class="p">)</span>
+        <span class="n">unit_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">file_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">ind</span><span class="p">,</span> <span class="n">sig</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">sig_files</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">sig</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">:</span>
+                <span class="c">#file_dict.update({switch_ext(os.path.basename(sig), &#39;&#39;): sig})</span>
+                <span class="n">file_dict</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">sig</span><span class="p">:</span> <span class="n">sig</span><span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                path_comps = os.path.split(os.path.dirname(sig))</span>
+<span class="sd">                chop_dir = path_comps[1]</span>
+<span class="sd">                name = os.path.split(path_comps[0])[1] + &#39;_&#39; + chop_dir + \</span>
+<span class="sd">                    &#39;_&#39; + switch_ext(os.path.basename(sig), &#39;&#39;)</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+                <span class="n">unit_dict</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">sig</span><span class="p">:</span> <span class="n">sig</span><span class="p">})</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">file_dict</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;No file analysis found! Cannot create file dataset&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">f_ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="o">.</span><span class="n">mergeFiles</span><span class="p">(</span><span class="n">file_dict</span><span class="p">)</span>
+            <span class="n">f_ds</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="s">&#39;file_ds.db&#39;</span><span class="p">))</span>
+    
+            <span class="n">tf_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">f_ds</span><span class="p">,</span> <span class="s">&#39;fixlength&#39;</span><span class="p">)</span>
+            <span class="n">tf_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tf_ds</span><span class="p">,</span> <span class="s">&#39;cleaner&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tf_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tf_ds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> 
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_get_unused_descriptors</span><span class="p">())</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Remove unused descriptors failed.... who cares??: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tf_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tf_ds</span><span class="p">,</span> <span class="s">&#39;normalize&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Transform or normalise failed.&quot;</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Might be a target with only high level segment? : &#39;</span><span class="si">%s</span><span class="s">&#39; &quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="n">tf_ds</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="s">&#39;file_ds.db&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit_dict</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;No unit analysis found! Cannot create unit dataset&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">u_ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="o">.</span><span class="n">mergeFiles</span><span class="p">(</span><span class="n">unit_dict</span><span class="p">)</span>
+            <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">u_ds</span><span class="p">,</span> <span class="s">&#39;fixlength&#39;</span><span class="p">)</span>
+            <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tu_ds</span><span class="p">,</span> <span class="s">&#39;cleaner&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tu_ds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> 
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_get_unused_descriptors</span><span class="p">())</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Remove unused descriptors failed.... who cares??: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tu_ds</span><span class="p">,</span> <span class="s">&#39;normalize&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Transform or normalise failed.&quot;</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Might be a target with only high level segment? : &#39;</span><span class="si">%s</span><span class="s">&#39; &quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="n">tu_ds</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="s">&#39;unit_ds_</span><span class="si">%s</span><span class="s">.db&#39;</span> <span class="o">%</span> <span class="n">chop</span><span class="p">))</span>
+    </div>
+<div class="viewcode-block" id="FileCorpus.get_gaia_unit_db"><a class="viewcode-back" href="../../index.html#hmosaic.corpus.FileCorpus.get_gaia_unit_db">[docs]</a>    <span class="k">def</span> <span class="nf">get_gaia_unit_db</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;onsets&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns a gaia db instance for similarity searching.</span>
+<span class="sd">            Gaia databases are composed of all units from a given chop size,</span>
+<span class="sd">            although in the case of onsets based segmentation unit size is </span>
+<span class="sd">            variable.</span>
+<span class="sd">            The ``chop`` argument is therefore required as it will be present</span>
+<span class="sd">            in the filename of the Gaia DataSet on disk.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">db_location</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="s">&#39;unit_ds_</span><span class="si">%s</span><span class="s">.db&#39;</span> <span class="o">%</span> <span class="n">chop</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">db_location</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_gaia_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">db_location</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">FileNotFoundException</span><span class="p">(</span><span class="s">&quot;This chop cannot be found &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                <span class="o">%</span> <span class="p">(</span><span class="n">chop</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">DataSet</span>
+        <span class="n">unit_db</span> <span class="o">=</span> <span class="n">DataSet</span><span class="p">()</span>
+        <span class="n">unit_db</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">db_location</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">unit_db</span> 
+        
+<span class="c">###############################################################################</span>
+<span class="c"># PRIVATE HELPER FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+        </div>
+    <span class="k">def</span> <span class="nf">_process_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Helper method to convert file to monophonic 44.1kHz wav format.</span>
+<span class="sd">            Accepts ``audio_filepath`` as parameter. This is assumed to be</span>
+<span class="sd">            a valid filepath. An audio array is then returned.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">to_mono</span><span class="p">(</span><span class="n">wavread</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+     
+    <span class="k">def</span> <span class="nf">_make_segments_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_filepath</span><span class="p">,</span> <span class="n">chop</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Private function to handle creating segment or ``chop``</span>
+<span class="sd">            subdirectories in the corpus. </span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">unit_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> \
+            <span class="n">switch_ext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">),</span> <span class="s">&#39;&#39;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">unit_dir</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Creating unit directory: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">unit_dir</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">unit_dir</span><span class="p">)</span>
+        <span class="n">segments_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unit_dir</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">chop</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">segments_dir</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Removing segment directory: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">segments_dir</span><span class="p">)</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">segments_dir</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Creating segment directory: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">segments_dir</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">segments_dir</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">segments_dir</span>
+    
+    <span class="k">def</span> <span class="nf">_check_segment_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Private function to check that a segment with the given</span>
+<span class="sd">            **chop** relative filepath, exists.</span>
+<span class="sd">           </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">name</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="n">FileNotFoundException</span><span class="p">(</span><span class="s">&quot;This chop cannot be found &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="p">)</span>
+     
+    <span class="k">def</span> <span class="nf">_list_segments</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Private function to list all the segmented audio folders.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">get_directories</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+        
+    <span class="k">def</span> <span class="nf">_check_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Utility function which raises an exception if the file cannot</span>
+<span class="sd">            be found in the corpus.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="ow">and</span> \
+            <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">filename</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="n">FileNotFoundException</span><span class="p">(</span><span class="s">&quot;Cannot find file: &#39;</span><span class="si">%s</span><span class="s">&#39; in corpus: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                <span class="o">%</span> <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Found the file &#39;</span><span class="si">%s</span><span class="s">&#39; in the corpus: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> 
+                <span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+            <span class="p">)</span>
+                
+        
+     
+    <span class="k">def</span> <span class="nf">_get_unused_descriptors</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns a list of unused descriptors to remove from the gaia db.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                <span class="p">[</span><span class="s">&#39;rhythm.beats_position&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.bpm_estimates&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.bpm_intervals&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.onset_times&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.rubato_start&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.rubato_stop&#39;</span><span class="p">,</span> 
+                <span class="p">]</span>
+            <span class="p">}</span>
+    
+               </div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Beginning basic script to reanalyse data in Audio Corpus&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Audio repository is &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">SOURCE_REPO</span><span class="p">)</span> 
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">SOURCE_REPO</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;corpuses are: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">cm</span><span class="o">.</span><span class="n">list_corpuses</span><span class="p">())</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Searching for previous analysis so as not to repeat&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">schedule</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="s">&#39;schedule.txt&#39;</span><span class="p">),</span> <span class="s">&#39;r&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Exception occurred &#39;</span><span class="si">%s</span><span class="s">&#39;, exiting&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+    
+    <span class="k">for</span> <span class="n">corpus</span> <span class="ow">in</span> <span class="n">cm</span><span class="o">.</span><span class="n">list_corpuses</span><span class="p">():</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">corpus</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">location</span><span class="p">)</span> <span class="ow">in</span> <span class="n">schedule</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Clean filenames, segment and analyse </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">c</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+            <span class="n">ca</span><span class="o">.</span><span class="n">rename_wavs</span><span class="p">()</span>
+            <span class="n">ca</span><span class="o">.</span><span class="n">execute_flac_convert</span><span class="p">()</span>
+            <span class="n">ca</span><span class="o">.</span><span class="n">execute_mp3_convert</span><span class="p">()</span>
+            <span class="n">segment_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+            <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">500</span><span class="p">)</span>
+            <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+            <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="mi">1250</span><span class="p">)</span>
+            <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="s">&#39;onsets&#39;</span><span class="p">)</span>        
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

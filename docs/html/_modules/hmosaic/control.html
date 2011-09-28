@@ -1,0 +1,1368 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.control &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.control</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/python</span>
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span>
+
+<span class="c"># Third party libraries</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">essentia.standard</span> <span class="kn">import</span> <span class="n">AudioOnsetsMarker</span>
+<span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">MetricFactory</span><span class="p">,</span> <span class="n">Point</span><span class="p">,</span> <span class="n">View</span><span class="p">,</span> <span class="n">DataSet</span><span class="p">,</span> <span class="n">transform</span>
+<span class="kn">from</span> <span class="nn">OSC</span> <span class="kn">import</span> <span class="n">OSCServer</span><span class="p">,</span> <span class="n">OSCMessage</span><span class="p">,</span> <span class="n">OSCClient</span><span class="p">,</span> <span class="n">OSCBundle</span>
+
+<span class="c"># Project imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span><span class="p">,</span> <span class="n">settings</span>
+<span class="kn">from</span> <span class="nn">hmosaic.analyse</span> <span class="kn">import</span> <span class="n">EssentiaAnalyser</span><span class="p">,</span> <span class="n">EssentiaError</span>
+<span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">Mosaic</span><span class="p">,</span> <span class="n">MosaicUnit</span>
+<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span><span class="p">,</span> <span class="n">FileNotFoundException</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">switch_ext</span><span class="p">,</span> <span class="n">wav_timestamp</span><span class="p">,</span> <span class="n">calc_chop_from_bpm</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">secs_to_samps</span><span class="p">,</span> <span class="n">timestretch</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">analyse_corpus</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts.createHighLevelChops</span> <span class="kn">import</span> <span class="n">process_corpus_highlevel</span>
+
+
+<div class="viewcode-block" id="extract_from_list"><a class="viewcode-back" href="../../index.html#hmosaic.control.extract_from_list">[docs]</a><span class="k">def</span> <span class="nf">extract_from_list</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This decorator is intended to manipulate  a list argument to functions,</span>
+<span class="sd">        returning the function without the argument when the list is empty and</span>
+<span class="sd">        with the value stripped from its list when the list has one value. </span>
+<span class="sd">        Designed to allow seamlessness between calling methods in </span>
+<span class="sd">        daemon mode (using OSCMessages) or calling them in programmatic mode.</span>
+<span class="sd">        i.e. So you don&#39;t have to put arguments in a list when calling methods</span>
+<span class="sd">        programatically  </span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_extract_from_list</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Decorator arguments are: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Returning </span><span class="si">%s</span><span class="s"> calling with params: &#39;</span><span class="si">%s</span><span class="s">, </span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+                    <span class="o">%</span> <span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Returning </span><span class="si">%s</span><span class="s"> calling with param: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+                    <span class="o">%</span> <span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Returning </span><span class="si">%s</span><span class="s"> calling with params: &#39;</span><span class="si">%s</span><span class="s">, </span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+                    <span class="o">%</span> <span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="c"># TO DO - Fix this - what if there is more than one arg?</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">_extract_from_list</span>
+</div>
+<div class="viewcode-block" id="strip_arguments"><a class="viewcode-back" href="../../index.html#hmosaic.control.strip_arguments">[docs]</a><span class="k">def</span> <span class="nf">strip_arguments</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Decorator to strip the arguments and keyword arguments from </span>
+<span class="sd">        a function call, </span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_strip_arguments</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">HighLevelControl</span><span class="p">):</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">func</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">_strip_arguments</span> 
+    
+
+</div>
+<div class="viewcode-block" id="Target"><a class="viewcode-back" href="../../index.html#hmosaic.control.Target">[docs]</a><span class="k">class</span> <span class="nc">Target</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simple model of a target with a filepath and </span>
+<span class="sd">        some useful analysis data like length and bpm</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the basic item of info: the targets filepath.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Makes sure the target filepath is returned as the objects string</span>
+<span class="sd">            representation</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span>
+
+<div class="viewcode-block" id="Target.set_props"><a class="viewcode-back" href="../../index.html#hmosaic.control.Target.set_props">[docs]</a>    <span class="k">def</span> <span class="nf">set_props</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">analysis</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Loads the analysis of the complete target file into a gaia point </span>
+<span class="sd">            and extracts certain high level features/classifiers. The features</span>
+<span class="sd">            are then stored in a dictionary for later retrieval.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a_dict</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">a_dict</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">analysis</span><span class="p">)</span>   
+        <span class="bp">self</span><span class="o">.</span><span class="n">props</span> <span class="o">=</span> <span class="n">a_dict</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span> <span class="o">=</span> <span class="n">a_dict</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">BPM</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">a_dict</span><span class="p">[</span><span class="n">settings</span><span class="o">.</span><span class="n">LENGTH</span><span class="p">]</span>
+
+</div></div>
+<div class="viewcode-block" id="HighLevelControl"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl">[docs]</a><span class="k">class</span> <span class="nc">HighLevelControl</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_manager</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            All the default values for the mosaicing session </span>
+<span class="sd">            are initialised here. A OSC client is created in </span>
+<span class="sd">            order to talk to the audio engine. Designed with pure</span>
+<span class="sd">            data in mind but is actually agnostic where the audio playback</span>
+<span class="sd">            mechanism is concerned.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># target parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tmp_name</span> <span class="o">=</span> <span class="s">&#39;temp_mosaic.wav&#39;</span>
+        
+
+        <span class="c"># segmentation parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chop</span> <span class="o">=</span> <span class="s">&#39;onsets&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span> <span class="o">=</span> <span class="p">{}</span>
+        
+        <span class="c"># concatenation parameters        </span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span> <span class="o">=</span> <span class="mi">15</span> <span class="c"># Default 15 millisecond crossfade</span>
+
+        <span class="c"># mosaicing parameters</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label_thresholds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">highlevel</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">highscope</span><span class="o">=</span><span class="mi">5</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lowscope</span> <span class="o">=</span> <span class="mi">5</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c"># Create an object for stretching/shrinking or cutting/padding</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gridder</span> <span class="o">=</span> <span class="n">Gridder</span><span class="p">()</span>
+        <span class="c"># Create the cost function</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cost</span> <span class="o">=</span> <span class="n">RepeatUnitCost</span><span class="p">()</span>
+        <span class="c"># Toggle for repeat cost function</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rep_cost</span> <span class="o">=</span> <span class="bp">False</span>     
+        <span class="c"># Initialise the context (for matching neighbouring units)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">Context</span><span class="p">()</span>
+        <span class="c"># Toggle for context cost function</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">con_cost</span> <span class="o">=</span> <span class="bp">False</span>
+        
+
+        <span class="c"># Set up the target corpi</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TARGET_REPO</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;temp&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;context&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;mosaics&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">)</span>
+    
+        <span class="c"># Create a reference to the source corpus manager</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source_manager</span> <span class="o">=</span> <span class="n">source_manager</span>       
+        
+        <span class="c"># Set up OSC client here so as not to preclude programmatical usage        </span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">OSCClient</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">audio_server</span> <span class="o">=</span> <span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">CLIENT_IP</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">CLIENT_PORT</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">daemon</span> <span class="o">=</span> <span class="n">daemon</span>
+
+
+        <span class="c"># If running as a daemon then listen forever...</span>
+        <span class="k">if</span> <span class="n">daemon</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">server</span> <span class="o">=</span> <span class="n">OSCServer</span><span class="p">((</span><span class="n">settings</span><span class="o">.</span><span class="n">SERVER_IP</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">SERVER_PORT</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">add</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">ADDRESS_STRINGS</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">addMsgHandler</span><span class="p">(</span><span class="s">&#39;/&#39;</span> <span class="o">+</span> <span class="n">add</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">listen</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Unknown exception occurred configuring OSC: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">server</span><span class="o">.</span><span class="n">serve_forever</span><span class="p">()</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># LISTEN FOR OSC MESSAGES FROM THE AUDIO ENGINE.</span>
+<span class="c">###############################################################################        </span>
+                
+<div class="viewcode-block" id="HighLevelControl.listen"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.listen">[docs]</a>    <span class="k">def</span> <span class="nf">listen</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pattern</span><span class="p">,</span> <span class="n">tags</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">client_address</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            OSC server method - all valid OSC requests get passed in here</span>
+<span class="sd">            and are delegated to functions of the class from here.</span>
+<span class="sd">            Some basic input validation may be done prior to calling functions.</span>
+<span class="sd">            Exceptions raised will not cause the program to bomb out, </span>
+<span class="sd">            so error handling is minimal and logging is maximal.</span>
+<span class="sd">            I have grouped acceptable message types by component where possible</span>
+<span class="sd">            e.g. target, analysis, context, etc.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;OSC Pattern received: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">pattern</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;OSC tags received are </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">tags</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;OSC data is </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">data</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">ADDRESS_STRINGS</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Incoming pattern </span><span class="si">%s</span><span class="s"> is not listed in </span><span class="se">\</span>
+<span class="s">                settings.ADDRESS_STRINGS - </span><span class="si">%s</span><span class="s">&quot;</span> 
+                    <span class="o">%</span> <span class="p">(</span><span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">settings</span><span class="o">.</span><span class="n">ADDRESS_STRINGS</span><span class="p">))</span>
+            <span class="k">return</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">:])(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Error occurred while calling function from osc msg:&#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span>
+                <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># SOURCE CORPUS RELATED FUNCTIONS</span>
+<span class="c">############################################################################### </span></div>
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setSourceCorpus</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_corpus</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Loads a new source corpus, from which to search for mosaic units. &quot;&quot;&quot;</span>
+        
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Loading new source corpus: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">source_corpus</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_manager</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">source_corpus</span><span class="p">)</span>
+    
+
+<div class="viewcode-block" id="HighLevelControl.analyseCorpus"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.analyseCorpus">[docs]</a>    <span class="k">def</span> <span class="nf">analyseCorpus</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Analyses the currrent corpus, using ``self.chop`` to determine the </span>
+<span class="sd">            segmentation scheme to search for.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;source_corpus&#39;</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Source corpus has not been selected. Doing nothing...&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">False</span>
+        <span class="n">file_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+        <span class="n">analyser</span> <span class="o">=</span> <span class="n">EssentiaAnalyser</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">audio_file</span> <span class="ow">in</span> <span class="n">file_list</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">analyser</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">audio_file</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">EssentiaError</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Essentia threw an error, skipping this one: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> \
+                    <span class="o">%</span> <span class="n">audio_file</span><span class="p">)</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># TARGET RELATED FUNCTIONS</span>
+<span class="c">###############################################################################        </span>
+</div>
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setTarget</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">            Adds the target to the database and sets self.target. </span>
+<span class="sd">            Target name in db is based on its original filename but if that </span>
+<span class="sd">            already exists then it uses a pattern based on the timestamp.</span>
+<span class="sd">            Target is analysed to extract information like BPM, length, etc.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+            
+        <span class="c"># Add target to the DB</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Incoming target: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">target_filepath</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">Target</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">)</span>
+            <span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Target name exists: </span><span class="si">%s</span><span class="s"> </span><span class="se">\n</span><span class="s"> Renaming based on timestamp&quot;</span> 
+            <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">Target</span><span class="p">(</span><span class="n">wav_timestamp</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">)))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+            
+        <span class="bp">self</span><span class="o">.</span><span class="n">analyser</span> <span class="o">=</span> <span class="n">EssentiaAnalyser</span><span class="p">()</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">get_filepath</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">analysis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">analyser</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">set_props</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">analysis</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Target has been set - name is: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        
+        
+    <span class="nd">@strip_arguments</span>
+    <span class="k">def</span> <span class="nf">processTarget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Processes the target for mosaicing. Segment it into units based on the</span>
+<span class="sd">            chosen segmentation scheme. Analyse the units.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Target has not been set, nothing to process...&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using Bpm based fixed segmentation.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span> <span class="o">=</span> <span class="n">calc_chop_from_bpm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">bpm</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Bpm is </span><span class="si">%s</span><span class="s">, target segment length will be </span><span class="si">%d</span><span class="s"> ms&quot;</span> 
+                <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">bpm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span>
+            
+        <span class="c"># Segment the audio - Where should the segmentation parameters be set?</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Segmenting target into units&quot;</span><span class="p">)</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">get_filepath</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">segment_audio</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">,</span> 
+            <span class="n">onset_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">,</span> <span class="n">aubio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">aubio</span>
+        <span class="p">)</span>
+        <span class="c"># Analyse the units</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Analysing target units&quot;</span><span class="p">)</span>        
+        <span class="k">for</span> <span class="n">audio</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span>
+            <span class="n">audio_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">analyser</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">audio</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Exception occurred analysing target units: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Assume error is due to silence and ignore...&quot;</span><span class="p">)</span>
+        
+        <span class="c"># Perform high level processing of target if appropriate.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">highlevel</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">process_target_hl</span><span class="p">()</span>
+
+        <span class="c"># Mosaic from target - this will always be a good thing</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">daemon</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">createMosaic</span><span class="p">()</span>
+
+<div class="viewcode-block" id="HighLevelControl.process_target_hl"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.process_target_hl">[docs]</a>    <span class="k">def</span> <span class="nf">process_target_hl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Processes the target for high level mosaicing.</span>
+<span class="sd">            The idea is to take a preanalysed, presegmented target</span>
+<span class="sd">            and process it in a high level manner - 5 second chunks</span>
+<span class="sd">            Create a gaia unit-db for each chunk.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">units</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span>
+            <span class="n">audio_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">)</span>
+        <span class="n">new_segments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">()</span>
+        <span class="n">analyser</span> <span class="o">=</span> <span class="n">EssentiaAnalyser</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">units</span><span class="p">:</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">MosaicUnit</span><span class="p">(</span><span class="n">u</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Number of units in mosaic is: </span><span class="si">%d</span><span class="s">, length of mosaic is </span><span class="si">%d</span><span class="s">&quot;</span> 
+                 <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">units</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">))</span>
+            <span class="c"># This AND clause prevents a Gaia Dataset of only 1 Point being created.</span>
+            <span class="c"># The problem is that if the dataset only has one point then all </span>
+            <span class="c"># descriptors get removed during &#39;cleaner&#39; analysis</span>
+            <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">units</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> 
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Current length of mosaic is </span><span class="si">%f</span><span class="s">, adding to list&quot;</span> 
+                    <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+                <span class="n">new_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_segments</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Retrieved only 1 high level mosaic unit of length: </span><span class="si">%f</span><span class="s">&quot;</span> 
+                <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+            <span class="n">new_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="o">!=</span> <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;The final mosaic in the sequence is of length </span><span class="si">%f</span><span class="s">&quot;</span> 
+                <span class="o">%</span> <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;The final generated mosaic has a length of: </span><span class="si">%f</span><span class="s">&quot;</span> 
+                <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Merging these two mosaics into one&quot;</span><span class="p">)</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">merge_mosaics</span><span class="p">(</span><span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">m</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Finished assembling units into segments of &gt; 5s&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;There are </span><span class="si">%d</span><span class="s"> segments in total to be processed for </span><span class="si">%s</span><span class="s">&quot;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">new_segments</span><span class="p">),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)))</span>
+        <span class="n">highlevel_dir</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">_make_segments_dir</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">seg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">new_segments</span><span class="p">):</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">highlevel_dir</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%05d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">)</span>
+            <span class="n">seg</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Analysing audio: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">analyser</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">unit_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Segment has </span><span class="si">%d</span><span class="s"> units&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">seg</span><span class="o">.</span><span class="n">units</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">unit</span> <span class="ow">in</span> <span class="n">seg</span><span class="o">.</span><span class="n">units</span><span class="p">:</span>
+                <span class="n">unit_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                    <span class="p">{</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">):</span> 
+                     <span class="n">switch_ext</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)</span>
+                    <span class="p">})</span>
+            <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">gaia_transform</span><span class="p">(</span><span class="n">unit_dict</span><span class="p">)</span>
+            <span class="n">tu_ds</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">highlevel_dir</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%05d</span><span class="s">.db&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_segments</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">create_gaia_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+        
+
+<span class="c">###############################################################################</span>
+<span class="c"># SEGMENTATION RELATED FUNCTIONS</span>
+<span class="c">###############################################################################      </span>
+</div>
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setCrossfade</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fade</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the concatenation crossfade.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># sets length of crossfade between units in ms</span>
+        <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">fade</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Removing unit crossfade&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">fade</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Unit crossfade is: </span><span class="si">%d</span><span class="s"> ms&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">)</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">toggleFixed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chop</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function sets `self.chop`, it can be used to toggle </span>
+<span class="sd">            the segmentation style, either *onsets* or *fixed length*. </span>
+<span class="sd">            If `chop` is 0 then we used onset based segmentation, </span>
+<span class="sd">            otherwise we chop the audio up into `chop` sized chunks.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">chop</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chop</span> <span class="o">=</span> <span class="n">chop</span>  
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using a fixed length segmentation globally. Chop size is </span><span class="si">%d</span><span class="s">&quot;</span>
+                <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span> 
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chop</span> <span class="o">=</span> <span class="s">&#39;onsets&#39;</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using onset based segementation globaly. Weights are </span><span class="si">%s</span><span class="s">&quot;</span>
+                <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">)</span>
+            
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">toggleBPM</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">toggle</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function is used to activate **BPM** related segmentation.</span>
+<span class="sd">            It sets ``self.bpm`` to **True** or **False**.</span>
+<span class="sd">            If set to **TRUE**, it means that ``self.chop`` is calculated </span>
+<span class="sd">            dynamically, based on the bpm of the target.</span>
+<span class="sd">            </span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">toggle</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chop</span> <span class="o">=</span> <span class="s">&#39;onsets&#39;</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Not using BPM to determine chop size, reverting to onsets&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">toggle</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span><span class="o">=</span> <span class="bp">True</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Will use target bpm to dynamically determine the chop size.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Unknown value received: &#39;</span><span class="si">%s</span><span class="s">&#39;, Doing nothing&quot;</span> <span class="o">%</span> <span class="n">toggle</span><span class="p">)</span>
+ 
+    
+<div class="viewcode-block" id="HighLevelControl.setOnsets"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.setOnsets">[docs]</a>    <span class="k">def</span> <span class="nf">setOnsets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">onsets_array</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Used to set the onsets weights parameter.</span>
+<span class="sd">            Converts pairs in a sequence to a dict representation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">onsets_array</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">onsets_array</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span><span class="n">onsets_array</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]})</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Essentia onset segmentation descriptors and weights are </span><span class="si">%s</span><span class="s">&quot;</span> 
+            <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">)</span>
+ </div>
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setAubio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">choice</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function can be used to switch between **aubio** and </span>
+<span class="sd">            **essentia** onset detection routines. </span>
+<span class="sd">      </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">choice</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span> <span class="o">=</span> <span class="bp">False</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using Essentia based onset detection routines globally&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">choice</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span> <span class="o">=</span> <span class="bp">True</span> 
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using Aubio based onset detection routines globally&quot;</span><span class="p">)</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setAubioLength</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function sets a minimum note length for the **aubio** based </span>
+<span class="sd">            note segmentation routine. It will merge together note events till</span>
+<span class="sd">            the minimum length is exceeded.</span>
+<span class="sd">            **TO DO** : Improve the note selection algorithm by adjusting the </span>
+<span class="sd">            aubio threshold instead, rather than the convoluted minimum length</span>
+<span class="sd">            logic that is currently being used.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Setting minimum note length for aubio onset detection to: </span><span class="si">%s</span><span class="s">&quot;</span> 
+            <span class="o">%</span> <span class="n">length</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">aubio_length</span> <span class="o">=</span> <span class="n">length</span>
+
+    <span class="nd">@strip_arguments</span>
+    <span class="k">def</span> <span class="nf">getMarkedAudio</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function calls a method of the corpus which marks the target</span>
+<span class="sd">            with beeps indicated by the position of the onsets in the list </span>
+<span class="sd">            and saves this as an audio file, the location of which is sent </span>
+<span class="sd">            to the audio engine.</span>
+<span class="sd">      </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span><span class="p">:</span>
+            <span class="n">chop</span> <span class="o">=</span> <span class="n">calc_chop_from_bpm</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">bpm</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">chop</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">marked_audio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">save_marked_audio</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span><span class="p">,</span> <span class="n">chop</span><span class="p">)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">OSCMessage</span><span class="p">(</span><span class="s">&#39;/loadMarked&#39;</span><span class="p">)</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">marked_audio</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">sendto</span><span class="p">(</span><span class="n">msg</span><span class="o">=</span><span class="n">msg</span><span class="p">,</span> <span class="n">address</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">audio_server</span><span class="p">)</span>
+      
+
+<span class="c">###############################################################################</span>
+<span class="c"># MOSAICING RELATED FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">trackLength</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Activates the gridder object to fit units to the </span>
+<span class="sd">           targets rhythmic grid.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Toggling gridder: </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">mode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gridder</span><span class="o">.</span><span class="n">set_active</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>  
+    
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">trackLengthType</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Sets gridder to silence or stretch. 1 means stretch, anything else</span>
+<span class="sd">           means silence</span>
+
+<span class="sd">        &quot;&quot;&quot;</span> 
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Setting gridder strategy to </span><span class="si">%d</span><span class="s"> (0 - silence, 1 - stretch)&quot;</span> 
+            <span class="o">%</span> <span class="n">mode</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gridder</span><span class="o">.</span><span class="n">strategy</span><span class="o">=</span><span class="n">mode</span>  
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">useLabel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">label</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets a label to be used during high level mosaicing.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">validate_setting</span><span class="p">(</span><span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">()):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Could not apply label: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Removing target tracking for label: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">label</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Current labels for high level target tracking are: </span><span class="si">%s</span><span class="s">&quot;</span>
+                <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span> 
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Appending target tracking for label: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">label</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Current labels for high level target tracking are: </span><span class="si">%s</span><span class="s">&quot;</span>
+                <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="HighLevelControl.useLabelThreshold"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.useLabelThreshold">[docs]</a>    <span class="k">def</span> <span class="nf">useLabelThreshold</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets a label and threshold to be used during high level mosaicing.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">validate_setting</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Could not apply label: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">label_thresholds</span><span class="p">:</span>
+            <span class="n">ind</span> <span class="o">=</span> <span class="n">label_thresholds</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">ind</span><span class="o">+</span><span class="mi">1</span>
+            <span class="n">label_thresholds</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+            <span class="n">label_thresholds</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">label_thresholds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="nb">float</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+</div>
+<div class="viewcode-block" id="HighLevelControl.setConstraints"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.setConstraints">[docs]</a>    <span class="k">def</span> <span class="nf">setConstraints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">constraints_array</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This sets **self.constraints**. These are the descriptors </span>
+<span class="sd">            and weights used during the low level unit search process.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Received low level constraints array: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">constraints_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span> <span class="o">=</span> <span class="p">{}</span> <span class="c"># Dict is reset every time? This could change.</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">constraints_array</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">constraints_array</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span><span class="n">constraints_array</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]})</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Gaia euclidean distances and weights for searching are </span><span class="si">%s</span><span class="s">&quot;</span>
+            <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="HighLevelControl.setHLConstraints"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.setHLConstraints">[docs]</a>    <span class="k">def</span> <span class="nf">setHLConstraints</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">constraints_array</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This sets **self.chl_onstraints**. These are the descriptors </span>
+<span class="sd">            and weights used during the high level unit search process.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Received high level constraints array: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">constraints_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span> <span class="o">=</span> <span class="p">{}</span> <span class="c"># Dict is reset every time? This could change.</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">constraints_array</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">constraints_array</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span><span class="n">constraints_array</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]})</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Gaia euclidean distances and weights for searching </span><span class="se">\</span>
+<span class="s">                      at a high level are </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span><span class="p">)</span>
+</div>
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">toggleHighLevel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            A simple switch for bypassing high level mosaicing.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Toggling highlevel mosaicing, val is </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">val</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">highlevel</span> <span class="o">=</span> <span class="n">val</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setHighScope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Defines the number of results returned during high level search.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will return </span><span class="si">%d</span><span class="s"> units from high level similarity search.&quot;</span> <span class="o">%</span> <span class="n">scope</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">highscope</span> <span class="o">=</span> <span class="n">scope</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">setLowScope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Defines the number of results returned during low level search.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will return </span><span class="si">%d</span><span class="s"> units from low level similarity search.&quot;</span> <span class="o">%</span> <span class="n">scope</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lowscope</span> <span class="o">=</span> <span class="n">scope</span>
+
+    <span class="nd">@extract_from_list</span>
+    <span class="k">def</span> <span class="nf">saveMosaic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">save_name</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Saves the target, the mosaic and a beep demarcated target </span>
+<span class="sd">            (where beeps sound at the locations of the detected onsets).</span>
+<span class="sd">            The files are saved into the **mosaic** corpus of the target </span>
+<span class="sd">            repository.</span>
+<span class="sd">            If ``save_name`` is **None** then the filename is autogenerated </span>
+<span class="sd">            based on the timestamp, else ``save_name`` is used as the root name</span>
+<span class="sd">            for saving the files, using the following convention:</span>
+<span class="sd">            * *save_nameMOSAIC.wav*</span>
+<span class="sd">            * *save_nameONSETS.wav*</span>
+<span class="sd">            * *save_nameTARGET.wav*</span>
+<span class="sd">            * *save_nameINFO.txt*</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">save_name</span><span class="p">:</span>
+            <span class="n">save_name</span> <span class="o">=</span> <span class="n">wav_timestamp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">target_filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">info_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="n">save_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span>\
+            <span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span><span class="o">.</span><span class="n">get_filepath</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tmp_name</span><span class="p">),</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;MOSAIC.wav&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Saved the mosaic as &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;MOSAIC.wav&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s">&#39;marked_audio&#39;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">marked_audio</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">save_marked_audio</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">marked_audio</span><span class="p">,</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;ONSETS.wav&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Saved the marked audio as &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;ONSETS.wav&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span><span class="o">.</span><span class="n">store_audio</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">,</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;TARGET.wav&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Saved the target as &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">save_name</span><span class="p">,</span> <span class="s">&#39;TARGET.wav&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span><span class="o">.</span><span class="n">store_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_info</span><span class="p">(),</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">info_path</span><span class="p">,</span> <span class="s">&#39;INFO.txt&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Saved the information as &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">info_path</span><span class="p">,</span> <span class="s">&#39;INFO.txt&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        
+    
+<div class="viewcode-block" id="HighLevelControl.send_mosaic_path"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.send_mosaic_path">[docs]</a>    <span class="k">def</span> <span class="nf">send_mosaic_path</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Simple method to copy the file at ``self.mosaic.filepath`` </span>
+<span class="sd">            to some predefined location where PureData or any other audio</span>
+<span class="sd">            engine can find it. An OSC message is then sent to the engine</span>
+<span class="sd">            to notify it that the file is ready. </span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Sending mosaic filepath &#39;</span><span class="si">%s</span><span class="s">&#39; to the audio engine. &quot;</span>
+            <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">OSCMessage</span><span class="p">(</span><span class="s">&#39;/loadMosaic&#39;</span><span class="p">)</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">sendto</span><span class="p">(</span><span class="n">msg</span><span class="o">=</span><span class="n">msg</span><span class="p">,</span> <span class="n">address</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">audio_server</span><span class="p">)</span>
+
+    <span class="c">#@extract_from_list</span></div>
+<div class="viewcode-block" id="HighLevelControl.loadLastTarget"><a class="viewcode-back" href="../../index.html#hmosaic.control.HighLevelControl.loadLastTarget">[docs]</a>    <span class="k">def</span> <span class="nf">loadLastTarget</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This finds the most recently processed target and sets it for use here.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">target_filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">get_most_recent</span><span class="p">()</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Loading last target: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">target_filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">Target</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">set_props</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Target has been set - name is: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">daemon</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Sending target_filepath: &#39;</span><span class="si">%s</span><span class="s">&#39; to GUI&quot;</span> <span class="o">%</span> <span class="n">target_filepath</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">OSCMessage</span><span class="p">(</span><span class="s">&#39;/loadTarget&#39;</span><span class="p">)</span>
+            <span class="n">msg</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target_filepath</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">sendto</span><span class="p">(</span><span class="n">msg</span><span class="o">=</span><span class="n">msg</span><span class="p">,</span> <span class="n">address</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">audio_server</span><span class="p">)</span>
+            
+        
+        </div>
+    <span class="nd">@strip_arguments</span> 
+    <span class="k">def</span> <span class="nf">createMosaic</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This is the main method of this class. It checks all the settings</span>
+<span class="sd">            and creates the mosaic accordingly. It sends the filepath to the </span>
+<span class="sd">            finished mosaic back to the gui client at the end if running in </span>
+<span class="sd">            daemon mode.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Check if target has been set.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Target has not been set !!! &quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">None</span>
+            
+
+        <span class="c"># Create a temporary file for the mosaic audio</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span><span class="o">.</span><span class="n">location</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tmp_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+
+        
+        
+
+        <span class="c"># If high level mosaicing is activated - perform high level processing.</span>
+        <span class="c"># The low level processing just needs a db of target points, </span>
+        <span class="c"># a view on the source db and the source db itself</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">highlevel</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>        
+                <span class="n">units</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span>
+                    <span class="n">audio_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Exception occurred looking for highlevel chop for </span><span class="si">%s</span><span class="s">&quot;</span>
+                    <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">process_target_hl</span><span class="p">()</span>
+                <span class="n">units</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span>
+                    <span class="n">audio_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">hdb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">get_gaia_unit_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">FileNotFoundException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Chop: &#39;highlevel_</span><span class="si">%s</span><span class="s">&#39; does not exist, creating...&quot;</span>
+                    <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span>
+                <span class="p">)</span>
+                <span class="n">process_corpus_highlevel</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">location</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span>
+                <span class="p">)</span>
+                <span class="n">hdb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">get_gaia_unit_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+                
+            <span class="n">distance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_distance</span><span class="p">(</span><span class="n">hdb</span><span class="p">,</span> <span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">hdb</span><span class="p">,</span> <span class="n">distance</span><span class="p">)</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">units</span><span class="p">:</span>
+                <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+                <span class="n">unit_name</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> <span class="s">&#39;&#39;</span><span class="p">)</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">setName</span><span class="p">(</span><span class="n">unit_name</span><span class="p">)</span>
+                <span class="n">p_m</span> <span class="o">=</span> <span class="n">hdb</span><span class="o">.</span><span class="n">history</span><span class="p">()</span><span class="o">.</span><span class="n">mapPoint</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">f</span><span class="p">:</span><span class="n">v</span><span class="o">.</span><span class="n">nnSearch</span><span class="p">(</span><span class="n">p_m</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">highscope</span><span class="p">)})</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Ok, now we have a dict with each target segment, along with its corresponding nearest matches in source db&quot;</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Check to see that we have every second of target audio accounted for - I think not!&quot;</span><span class="p">)</span> 
+            
+            <span class="n">ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">units</span> <span class="o">=</span> <span class="p">[]</span>
+                
+                <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">]:</span>
+                    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">==</span> <span class="nb">type</span><span class="p">(</span><span class="n">Point</span><span class="p">()):</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;It&#39;s a gaia point...</span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">u</span><span class="o">.</span><span class="n">name</span><span class="p">())</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Here is what&#39;s in results: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">results</span><span class="p">)</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;This is the key that spawned it: &#39;</span><span class="si">%s</span><span class="s">&#39;, and the item for that key: &#39;</span><span class="si">%s</span><span class="s">&#39; Ok, we&#39;ll skip it&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">]))</span>
+                        <span class="k">continue</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ds</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s">&#39;.db&#39;</span><span class="p">))</span>
+                       
+                    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">pointNames</span><span class="p">():</span>
+                        <span class="n">units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+                <span class="n">new_ds</span> <span class="o">=</span> <span class="n">gaia_transform</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">units</span><span class="p">,</span> <span class="n">units</span><span class="p">)))</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">r</span><span class="p">:</span><span class="n">new_ds</span><span class="p">})</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">index_skip</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="c"># Very important - target units must be in correct order</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="n">tds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="p">()</span>
+                <span class="n">tds</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="s">&#39;.db&#39;</span><span class="p">))</span>
+            
+                <span class="n">sds</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">]</span>
+                <span class="n">tds</span><span class="p">,</span> <span class="n">sds</span> <span class="o">=</span> <span class="n">equalise_datasets</span><span class="p">(</span><span class="n">tds</span><span class="p">,</span> <span class="n">sds</span><span class="p">)</span>
+
+                <span class="n">sv</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">sds</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_distance</span><span class="p">(</span><span class="n">sds</span><span class="p">))</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Beginning to loop through units for this segment&quot;</span><span class="p">)</span>
+        
+                <span class="k">for</span> <span class="n">pname</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">tds</span><span class="o">.</span><span class="n">pointNames</span><span class="p">()):</span>
+                    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pname</span><span class="p">)</span> <span class="o">!=</span> <span class="s">&#39;</span><span class="si">%07d</span><span class="s">.yaml&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">):</span>
+                        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Current unit is </span><span class="si">%s</span><span class="s"> =&gt; Missing a unit &#39;</span><span class="si">%07d</span><span class="s">.yaml&#39; </span><span class="se">\</span>
+<span class="s">                            - it must be silent... Index is </span><span class="si">%d</span><span class="s">, index skip is </span><span class="si">%d</span><span class="s">&quot;</span> 
+                                <span class="o">%</span> <span class="p">(</span><span class="n">pname</span><span class="p">,</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">),</span> <span class="n">index</span><span class="p">,</span> <span class="n">index_skip</span><span class="p">))</span>
+                        <span class="n">u</span> <span class="o">=</span> <span class="n">MosaicUnit</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">pname</span><span class="p">),</span> <span class="s">&#39;</span><span class="si">%07d</span><span class="s">.wav&#39;</span> 
+                            <span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">)))</span>
+                        <span class="n">u</span><span class="o">.</span><span class="n">silent</span> <span class="o">=</span> <span class="bp">True</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+                        <span class="n">index_skip</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_assemble_low_level</span><span class="p">(</span><span class="n">pname</span><span class="p">,</span> <span class="n">sds</span><span class="p">,</span> <span class="n">sv</span><span class="p">)</span>
+                    <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">get_gaia_unit_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+            <span class="n">sv</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">sds</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_distance</span><span class="p">(</span><span class="n">sds</span><span class="p">))</span>
+        
+            <span class="c"># Loop through target units and create mosaic </span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">unit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span>\
+                <span class="n">audio_filename</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">)):</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+                    <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;</span><span class="si">%s</span><span class="s"> doesn&#39;t exist-insert silent unit, same len as </span><span class="si">%s</span><span class="s">!&quot;</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">unit</span><span class="p">))</span>
+                    <span class="n">mu</span> <span class="o">=</span> <span class="n">MosaicUnit</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+                    <span class="n">mu</span><span class="o">.</span><span class="n">silent</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">mu</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_assemble_low_level</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">sds</span><span class="p">,</span> <span class="n">sv</span><span class="p">)</span>
+            
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Finished looping though target units&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Mosaic length is: </span><span class="si">%f</span><span class="s">, target length is: </span><span class="si">%f</span><span class="s">&quot;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">length</span><span class="p">))</span>
+          
+        <span class="c"># apply crossfade</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;BPM is: (</span><span class="si">%s</span><span class="s">) =&gt; unit length is: (</span><span class="si">%f</span><span class="s">)&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">bpm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Timestretching to fit BPM - unit length is: </span><span class="si">%f</span><span class="s">, crossfade is </span><span class="si">%d</span><span class="s">&quot;</span> 
+                <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">timestretch</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_chop</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="mi">1000</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Applying crossfade of </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">crossfade</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">)</span>
+
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Mosaic length is: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+
+        <span class="c"># Reset the cost and context objects</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cost</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+        
+        <span class="c"># Persist mosaic to disk and send a messsage to audio engine.</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Persisting mosaic to disk&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">persist</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">daemon</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">send_mosaic_path</span><span class="p">()</span>
+       
+            <span class="c">#return mosaic</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># PRIVATE FUNCTIONS</span>
+<span class="c">############################################################################### </span>
+
+
+    <span class="k">def</span> <span class="nf">_assemble_low_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pname</span><span class="p">,</span> <span class="n">sds</span><span class="p">,</span> <span class="n">sv</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Factor out the low level code in order to avoid</span>
+<span class="sd">            repeating it in the main *createMosaic* method.</span>
+<span class="sd">            </span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">pname</span><span class="p">)</span>
+        <span class="n">p_m</span> <span class="o">=</span> <span class="n">sds</span><span class="o">.</span><span class="n">history</span><span class="p">()</span><span class="o">.</span><span class="n">mapPoint</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="n">unit_results</span> <span class="o">=</span> <span class="n">sv</span><span class="o">.</span><span class="n">nnSearch</span><span class="p">(</span><span class="n">p_m</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lowscope</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;For </span><span class="si">%s</span><span class="s">, the closest matching points are: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pname</span><span class="p">,</span> <span class="n">unit_results</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rep_cost</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Applying repetition cost&quot;</span><span class="p">)</span>
+            <span class="n">unit_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cost</span><span class="o">.</span><span class="n">get_results</span><span class="p">(</span><span class="n">unit_results</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Results are now: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">unit_results</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">con_cost</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Applying Context&quot;</span><span class="p">)</span>
+            <span class="n">unit_results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_results</span><span class="p">(</span><span class="n">unit_results</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Results are now: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">unit_results</span><span class="p">))</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">unit_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Choosing this unit: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;.wav&#39;</span><span class="p">)</span>
+        <span class="n">su</span> <span class="o">=</span> <span class="n">MosaicUnit</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">gridder</span><span class="o">.</span><span class="n">active</span><span class="p">:</span>
+            <span class="n">tl</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s">&#39;length&#39;</span><span class="p">])</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Length of target unit is </span><span class="si">%f</span><span class="s">, length of chosen source unit is </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">tl</span><span class="p">,</span> <span class="n">su</span><span class="o">.</span><span class="n">length</span><span class="p">))</span>
+            <span class="n">su</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">gridder</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">su</span><span class="p">,</span> <span class="n">tl</span><span class="p">)</span>  
+        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">su</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">con_cost</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rep_cost</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cost</span><span class="o">.</span><span class="n">check_repeats</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        
+
+    <span class="k">def</span> <span class="nf">_get_distance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">ctype</span><span class="o">=</span><span class="s">&#39;lowlevel&#39;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Expects constraints to be populated but applies a default linear</span>
+<span class="sd">            combination if not. Returns a gaia distance object to be used</span>
+<span class="sd">            when searching for source units.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Set db,constraints and default settings depending on ctype being high or low!</span>
+        <span class="k">if</span> <span class="n">ctype</span> <span class="o">==</span> <span class="s">&#39;highlevel&#39;</span><span class="p">:</span>
+            <span class="n">constraints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="n">get_mood_distance</span>
+            <span class="n">db</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">get_gaia_unit_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">constraints</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="n">get_low_level_distance</span>
+            <span class="c">#db = self.source_corpus.get_gaia_unit_db(chop=self.chop)</span>
+            
+        
+        <span class="c"># If the desired constraints are empty then create the defaults.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">constraints</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">distance</span> <span class="o">=</span> <span class="n">default</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>  
+            <span class="n">distances</span> <span class="o">=</span> <span class="p">{}</span>        
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">key</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                              <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                                  <span class="n">key</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> 
+                             <span class="p">}})</span>
+        
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Similarity search distances are : </span><span class="si">%s</span><span class="s">, type is </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">distances</span><span class="p">,</span> <span class="n">ctype</span><span class="p">))</span>  
+            <span class="n">distance</span> <span class="o">=</span> <span class="n">MetricFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s">&#39;linearcombination&#39;</span><span class="p">,</span> <span class="n">db</span><span class="o">.</span><span class="n">layout</span><span class="p">(),</span> \
+                 <span class="n">distances</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">distance</span>
+
+    <span class="k">def</span> <span class="nf">_get_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Builds a dictionary of information, relating to the current state</span>
+<span class="sd">            of the mosaicer.</span>
+<span class="sd">            Information is:</span>
+<span class="sd">            * bpm</span>
+<span class="sd">            * onset_weights</span>
+<span class="sd">            * chop</span>
+<span class="sd">            * constraints</span>
+<span class="sd">            * high level constraints</span>
+<span class="sd">          </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span> 
+                 <span class="s">&#39;bpm&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">bpm</span><span class="p">,</span>
+                 <span class="s">&#39;aubio&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">aubio</span><span class="p">,</span>
+                 <span class="s">&#39;chop&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">,</span>
+                 <span class="s">&#39;onset_weights&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">onset_weights</span><span class="p">,</span>
+                 <span class="s">&#39;corpus&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">source_corpus</span><span class="o">.</span><span class="n">location</span><span class="p">,</span>
+                 <span class="s">&#39;constraints&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span><span class="p">,</span>
+                 <span class="s">&#39;HighLevelConstraints&#39;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">hl_constraints</span>
+                <span class="p">}</span>
+     
+</div>
+<div class="viewcode-block" id="validate_setting"><a class="viewcode-back" href="../../index.html#hmosaic.control.validate_setting">[docs]</a><span class="k">def</span> <span class="nf">validate_setting</span><span class="p">(</span><span class="n">setting</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Makes sure that the given **setting** exists in `settings.py`.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">setting</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">True</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Setting &#39;</span><span class="si">%s</span><span class="s">&#39; does not exist!! -- &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="n">setting</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">False</span>
+</div>
+<div class="viewcode-block" id="equalise_datasets"><a class="viewcode-back" href="../../index.html#hmosaic.control.equalise_datasets">[docs]</a><span class="k">def</span> <span class="nf">equalise_datasets</span><span class="p">(</span><span class="n">tds</span><span class="p">,</span> <span class="n">sds</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">       Takes two Gaia datasets and makes sure they have the same layout.</span>
+<span class="sd">   </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">source_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">sds</span><span class="o">.</span><span class="n">layout</span><span class="p">()</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">())</span>
+    <span class="n">target_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">tds</span><span class="o">.</span><span class="n">layout</span><span class="p">()</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">())</span>
+    <span class="n">remove_from_source</span> <span class="o">=</span> <span class="n">source_set</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">target_set</span><span class="p">)</span>
+    <span class="n">remove_from_target</span> <span class="o">=</span> <span class="n">target_set</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">source_set</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will try to remove </span><span class="si">%s</span><span class="s"> from the source DataSet&quot;</span> <span class="o">%</span> <span class="n">remove_from_source</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span><span class="nb">list</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">)})</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Failed to remove </span><span class="si">%s</span><span class="s"> from source DataSet&quot;</span> <span class="o">%</span> <span class="nb">list</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">))</span>
+                
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will try to remove </span><span class="si">%s</span><span class="s"> from the target DataSet&quot;</span> <span class="o">%</span> <span class="n">remove_from_source</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">tds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span><span class="nb">list</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">)})</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Failed to remove </span><span class="si">%s</span><span class="s"> from target DataSet&quot;</span> <span class="o">%</span> <span class="nb">list</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">tds</span><span class="p">,</span> <span class="n">sds</span>
+
+</div>
+<div class="viewcode-block" id="Gridder"><a class="viewcode-back" href="../../index.html#hmosaic.control.Gridder">[docs]</a><span class="k">class</span> <span class="nc">Gridder</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Transforms Mosaic Units to match the length of the target unit.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Two possible strategies</span>
+<span class="sd">            * timestretch (default)</span>
+<span class="sd">            * Cut or pad with silence</span>
+<span class="sd">            The first strategy is self explanatory, the second operates </span>
+<span class="sd">            differently depending on the length of the unit. If the target </span>
+<span class="sd">            unit is longer, it pads the mosaic unit with silence, if the </span>
+<span class="sd">            target unit is shorter it simply cuts the mosaicUnit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="o">=</span> <span class="n">strategy</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="bp">False</span>
+
+<div class="viewcode-block" id="Gridder.set_active"><a class="viewcode-back" href="../../index.html#hmosaic.control.Gridder.set_active">[docs]</a>    <span class="k">def</span> <span class="nf">set_active</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">switch</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Turn this gridder object on or off.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">switch</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">active</span><span class="o">=</span><span class="bp">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="bp">False</span>
+</div>
+<div class="viewcode-block" id="Gridder.fit"><a class="viewcode-back" href="../../index.html#hmosaic.control.Gridder.fit">[docs]</a>    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unit</span><span class="p">,</span> <span class="n">tlength</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            The fit method takes two params</span>
+<span class="sd">            * *unit* - The unit to be modified</span>
+<span class="sd">            * *tlength* - The target length</span>
+<span class="sd">            This method simply applies the current strategy and returns a new unit</span>
+<span class="sd">            of the correct length.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">unit</span> <span class="o">=</span> <span class="n">timestretch</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="n">tlength</span><span class="p">,</span> <span class="mi">44100</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tsamps</span> <span class="o">=</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="n">tlength</span><span class="p">,</span> <span class="mi">44100</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;</span> <span class="n">tlength</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Cut the unit data to </span><span class="si">%d</span><span class="s"> samples&quot;</span> <span class="o">%</span> <span class="n">tsamps</span><span class="p">)</span>
+                <span class="n">unit</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span><span class="n">tsamps</span><span class="p">]</span>
+                <span class="n">unit</span><span class="o">.</span><span class="n">recalculate</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">length</span> <span class="o">&lt;</span> <span class="n">tlength</span><span class="p">:</span>
+                <span class="n">padsamps</span> <span class="o">=</span> <span class="n">tsamps</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Pad with </span><span class="si">%d</span><span class="s"> samples of silence&quot;</span> <span class="o">%</span> <span class="n">padsamps</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">padsamps</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">unit</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">padsamps</span><span class="p">,</span> <span class="s">&#39;single&#39;</span><span class="p">)))</span>
+                    <span class="n">unit</span><span class="o">.</span><span class="n">recalculate</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">unit</span>
+                
+   
+       
+        
+</div></div>
+<div class="viewcode-block" id="Context"><a class="viewcode-back" href="../../index.html#hmosaic.control.Context">[docs]</a><span class="k">class</span> <span class="nc">Context</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This class keeps track of a certain number of previous units</span>
+<span class="sd">        It can be used to weight the gaia results based on similarity </span>
+<span class="sd">        between each result and the audio in the context.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the ``length`` of the context.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+        
+<div class="viewcode-block" id="Context.append"><a class="viewcode-back" href="../../index.html#hmosaic.control.Context.append">[docs]</a>    <span class="k">def</span> <span class="nf">append</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Appends an entry to the dictionary, changes behaviour when full</span>
+<span class="sd">            This was inspired by the Python Cookbook RingBuffer recipe.</span>
+<span class="sd"> </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">20</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">append</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_append_full</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+</div>
+    <span class="k">def</span> <span class="nf">_append_full</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Method used to poulate elements once ringbuffer is full.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cur</span><span class="p">]</span> <span class="o">=</span> <span class="n">key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cur</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cur</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span>
+        
+        
+     
+<div class="viewcode-block" id="Context.reset"><a class="viewcode-back" href="../../index.html#hmosaic.control.Context.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Helper method to reset the cost function every time.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="p">[]</span> 
+</div>
+<div class="viewcode-block" id="Context.get_results"><a class="viewcode-back" href="../../index.html#hmosaic.control.Context.get_results">[docs]</a>    <span class="k">def</span> <span class="nf">get_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Creates a GaiaDB of the previous context and searches for each point </span>
+<span class="sd">           in the resultset. Returns results updated with the local distance</span>
+<span class="sd">           factored in.</span>
+<span class="sd">           The simplest way is to calculate the total distance from each point</span>
+<span class="sd">           for each result and add that to the result score. That way, those which are very </span>
+<span class="sd">           different will be penalised.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">4</span><span class="p">:</span> <span class="c"># Try and avoid problems with gaia - missing descriptors cause the DS is too small</span>
+            <span class="k">return</span> <span class="n">results</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+        <span class="n">cds</span> <span class="o">=</span> <span class="n">gaia_transform</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">cds</span><span class="p">,</span> <span class="n">get_low_level_distance</span><span class="p">(</span><span class="n">cds</span><span class="p">))</span>
+        <span class="n">new_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+            <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">p_m</span> <span class="o">=</span> <span class="n">cds</span><span class="o">.</span><span class="n">history</span><span class="p">()</span><span class="o">.</span><span class="n">mapPoint</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">nnSearch</span><span class="p">(</span><span class="n">p_m</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+            <span class="n">cost</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">)</span>
+            <span class="n">new_results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">cost</span><span class="p">,</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">([(</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">new_results</span><span class="p">)])</span>
+           
+
+    
+</div></div>
+<div class="viewcode-block" id="RepeatUnitCost"><a class="viewcode-back" href="../../index.html#hmosaic.control.RepeatUnitCost">[docs]</a><span class="k">class</span> <span class="nc">RepeatUnitCost</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This should accept a gaia result set as input and</span>
+<span class="sd">        return a single unit as output.</span>
+<span class="sd">        Cost is based on gaia similarity score, if the result has</span>
+<span class="sd">        already been selected and (maybe) the similarity of the result</span>
+<span class="sd">        to the context.</span>
+<span class="sd">        This Cost object ought to be configurable...</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="mi">20</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            ``factor`` is multiplied by the number of times the unit appears in the context.</span>
+<span class="sd">            This number is then added to the score for that unit in the current search results.</span>
+<span class="sd">            This incresases its distance and thus a different unit may be selected if the units</span>
+<span class="sd">            are quite similar to each other.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">factor</span> <span class="o">=</span> <span class="n">factor</span>
+
+<div class="viewcode-block" id="RepeatUnitCost.reset"><a class="viewcode-back" href="../../index.html#hmosaic.control.RepeatUnitCost.reset">[docs]</a>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            helper method to reset the cost function</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span> <span class="o">=</span> <span class="p">{}</span>
+        
+        
+
+    </div>
+<div class="viewcode-block" id="RepeatUnitCost.get_results"><a class="viewcode-back" href="../../index.html#hmosaic.control.RepeatUnitCost.get_results">[docs]</a>    <span class="k">def</span> <span class="nf">get_results</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">results</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="c"># A crude weight, it will favour less repition over time</span>
+                <span class="n">new_results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factor</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span><span class="p">[</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]]),</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+                
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">new_results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+        <span class="n">sorted_results</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">new_results</span><span class="p">)])</span>
+        
+
+        <span class="k">return</span> <span class="n">sorted_results</span>
+</div>
+<div class="viewcode-block" id="RepeatUnitCost.check_repeats"><a class="viewcode-back" href="../../index.html#hmosaic.control.RepeatUnitCost.check_repeats">[docs]</a>    <span class="k">def</span> <span class="nf">check_repeats</span><span class="p">(</span><span class="n">unit</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">unit</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span><span class="p">[</span><span class="n">unit</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prev_units</span><span class="p">[</span><span class="n">unit</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        
+
+
+    
+
+</div></div>
+<div class="viewcode-block" id="get_unused_descriptors"><a class="viewcode-back" href="../../index.html#hmosaic.control.get_unused_descriptors">[docs]</a><span class="k">def</span> <span class="nf">get_unused_descriptors</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a set of descriptors which are not used and which occasionaly </span>
+<span class="sd">        cause problems with gaia due to their values.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;rhythm.beats_position&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.bpm_estimates&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.bpm_intervals&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.onset_times&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.rubato_start&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.rubato_stop&#39;</span><span class="p">,</span> 
+                <span class="p">]:</span>
+        <span class="k">yield</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">d</span><span class="p">]}</span>
+    
+
+
+    <span class="c">#corpus.create_gaia_db(chop=&#39;highlevel&#39;)</span>
+        
+
+</div>
+<div class="viewcode-block" id="get_mood_distance"><a class="viewcode-back" href="../../index.html#hmosaic.control.get_mood_distance">[docs]</a><span class="k">def</span> <span class="nf">get_mood_distance</span><span class="p">(</span><span class="n">unit_db</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a hard coded mood distance. A linear combination of</span>
+<span class="sd">        euclidean distances for all 4 moods.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">distances</span> <span class="o">=</span> <span class="p">{}</span>
+        
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist1&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                          <span class="p">[</span><span class="s">&#39;highlevel.mood_happy.all.happy&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mi">1</span> 
+                             <span class="p">}})</span>
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist2&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                          <span class="p">[</span><span class="s">&#39;highlevel.mood_sad.all.sad&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mi">1</span> 
+                             <span class="p">}})</span>
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist3&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                          <span class="p">[</span><span class="s">&#39;highlevel.mood_relaxed.all.relaxed&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mi">1</span> 
+                             <span class="p">}})</span>
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist4&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                          <span class="p">[</span><span class="s">&#39;highlevel.mood_aggressive.all.aggressive&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mi">1</span> 
+                             <span class="p">}})</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;highlevel level search distances are : </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">distances</span><span class="p">)</span>
+    <span class="n">distance</span> <span class="o">=</span> <span class="n">MetricFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s">&#39;linearcombination&#39;</span><span class="p">,</span> <span class="n">unit_db</span><span class="o">.</span><span class="n">layout</span><span class="p">(),</span> \
+             <span class="n">distances</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">distance</span>   
+</div>
+<div class="viewcode-block" id="get_low_level_distance"><a class="viewcode-back" href="../../index.html#hmosaic.control.get_low_level_distance">[docs]</a><span class="k">def</span> <span class="nf">get_low_level_distance</span><span class="p">(</span><span class="n">unit_db</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a hard coded low level distance based on length, pitch and </span>
+<span class="sd">        spectral energy</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">distances</span> <span class="o">=</span> <span class="p">{}</span>
+        
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist1&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                      <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                          <span class="p">[</span><span class="s">&#39;metadata.audio_properties.length&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mi">1</span> 
+                             <span class="p">}})</span>
+    <span class="n">distances</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s">&#39;dist2&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;distance&#39;</span><span class="p">:</span> <span class="s">&#39;euclidean&#39;</span><span class="p">,</span>
+                              <span class="s">&#39;params&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> 
+                                  <span class="p">[</span><span class="s">&#39;pitch.mean&#39;</span><span class="p">,</span> <span class="s">&#39;spectral_energy.mean&#39;</span><span class="p">]</span>
+                               <span class="p">},</span>
+                               <span class="s">&#39;weight&#39;</span><span class="p">:</span> <span class="mf">0.5</span> 
+                             <span class="p">}})</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Low level search distances are : </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">distances</span><span class="p">)</span>
+    <span class="n">distance</span> <span class="o">=</span> <span class="n">MetricFactory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s">&#39;linearcombination&#39;</span><span class="p">,</span> <span class="n">unit_db</span><span class="o">.</span><span class="n">layout</span><span class="p">(),</span> \
+             <span class="n">distances</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Distance created successfully&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">distance</span>
+    
+</div>
+<div class="viewcode-block" id="gaia_transform"><a class="viewcode-back" href="../../index.html#hmosaic.control.gaia_transform">[docs]</a><span class="k">def</span> <span class="nf">gaia_transform</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Takes a dict of point names and filepaths</span>
+<span class="sd">        Creates a DataSet and performs the standard transformations </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="o">.</span><span class="n">mergeFiles</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;fixlength&#39;</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;cleaner&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span> <span class="n">get_unused_descriptors</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>   
+            <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="n">desc</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Problem removing this descriptor: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;normalize&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ds</span>
+
+
+
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">SOURCE_REPO</span><span class="p">)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">HighLevelControl</span><span class="p">(</span><span class="n">cm</span><span class="p">)</span>
+    
+    
+    
+
+    
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

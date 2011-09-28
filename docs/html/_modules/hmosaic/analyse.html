@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.analyse &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.analyse</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Different music content analysers are stored here.</span>
+<span class="sd">The system was built on top of Essentia, however in order to</span>
+<span class="sd">use some other analyser you just need to provide</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">subprocess</span><span class="o">,</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">wavread</span>
+
+
+
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">switch_ext</span><span class="p">,</span> <span class="n">load_yaml</span> 
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span><span class="p">,</span> <span class="n">settings</span>
+
+
+<div class="viewcode-block" id="EssentiaError"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.EssentiaError">[docs]</a><span class="k">class</span> <span class="nc">EssentiaError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</div>
+<div class="viewcode-block" id="EssentiaAnalyser"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.EssentiaAnalyser">[docs]</a><span class="k">class</span> <span class="nc">EssentiaAnalyser</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Is used for invoking the binary essentia analyser.</span>
+<span class="sd">        It may be run in batch mode or for a single file.</span>
+<span class="sd">        The extracted analysis is always written to a .yaml</span>
+<span class="sd">        file with the same filepath as the original .wav file</span>
+<span class="sd">        which was presented for analysis.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the essentia binary to the path stored in settings.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>    
+        <span class="bp">self</span><span class="o">.</span><span class="n">ESSENTIA_BIN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">ESSENTIA_BIN_DIR</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">DEFAULT_ANALYSER</span><span class="p">)</span>  
+        
+<div class="viewcode-block" id="EssentiaAnalyser.analyse"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.EssentiaAnalyser.analyse">[docs]</a>    <span class="k">def</span> <span class="nf">analyse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_files</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">             Parameter is a list of audio files.</span>
+<span class="sd">             A generator is returned with the analysis data for each file.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">audio_files</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            </div>
+<div class="viewcode-block" id="EssentiaAnalyser.set_bin"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.EssentiaAnalyser.set_bin">[docs]</a>    <span class="k">def</span> <span class="nf">set_bin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bin_name</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Allows dynamic switching of binary analysers, e.g. for analysing </span>
+<span class="sd">            solely low level features one can enjoy a much faster analysis </span>
+<span class="sd">            process by switching the analyser binary. The only constraint is </span>
+<span class="sd">            that the new binary must be stored in the same directory as the </span>
+<span class="sd">            default setting (read from settings.py)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_bin</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">ESSENTIA_BIN_DIR</span><span class="p">,</span> <span class="n">bin_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">new_bin</span><span class="p">):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Using new essentia bin: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">new_bin</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ESSENTIA_BIN</span> <span class="o">=</span> <span class="n">new_bin</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;&#39;</span><span class="si">%s</span><span class="s">&#39; is not a file, keeping original: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> 
+               <span class="o">%</span> <span class="p">(</span><span class="n">new_bin</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ESSENTIA_BIN</span><span class="p">))</span>
+    </div>
+<div class="viewcode-block" id="EssentiaAnalyser.analyse_audio"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.EssentiaAnalyser.analyse_audio">[docs]</a>    <span class="k">def</span> <span class="nf">analyse_audio</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">audio_filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            This function invokes the essentia binary.</span>
+<span class="sd">            Reads in the output file, deletes the file </span>
+<span class="sd">            and returns a dictionary.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+    
+        <span class="c">#We actuallly have to be in the same directory as the streaming</span>
+        <span class="c"># extracor in order to make this work....</span>
+        <span class="n">current_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">ESSENTIA_BIN_DIR</span><span class="p">)</span>
+        
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">ESSENTIA_BIN</span><span class="p">,</span> <span class="n">audio_filepath</span><span class="p">,</span> \
+            <span class="n">switch_ext</span><span class="p">(</span><span class="n">audio_filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)]</span>
+        <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> \
+        <span class="n">stderr</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span><span class="p">)</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%s</span><span class="s"> </span><span class="se">\n</span><span class="s"> </span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span><span class="p">))</span>
+        <span class="n">pat</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s">&#39;ERROR.+$&#39;</span><span class="p">)</span>
+        <span class="n">match</span> <span class="o">=</span> <span class="n">pat</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">stdout</span><span class="p">)</span>
+        
+        <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">current_dir</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">EssentiaError</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">())</span>
+        <span class="c"># Change this to return the analysis filepath!!</span>
+        <span class="k">return</span> <span class="n">audio_filepath</span>
+
+
+<span class="c"># This function returns the magnitude of the positive spectrum from the </span>
+<span class="c"># fft frame.</span></div></div>
+<span class="n">pos_spec</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">fft_frame</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">fft_frame</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="nb">len</span><span class="p">(</span><span class="n">fft_frame</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span>
+
+<span class="c"># This function finds all magnitudes in a certain frequency range</span>
+<span class="c"># It is, effectively speaking, a band pass filter.</span>
+<span class="n">find_mags</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">mag</span><span class="p">,</span> <span class="n">freq_bins</span><span class="p">,</span> <span class="n">val1</span><span class="p">,</span> <span class="n">val2</span><span class="p">:</span> \
+    <span class="p">[</span><span class="n">mag</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">freq_bins</span><span class="p">)</span> \
+        <span class="k">if</span> <span class="n">val</span> <span class="o">&gt;=</span> <span class="n">val1</span> <span class="ow">and</span> <span class="n">val</span> <span class="o">&lt;=</span> <span class="n">val2</span><span class="p">]</span>
+
+
+<span class="c"># This is a function to get the next power of 2 up from the given window_size</span>
+<span class="n">next_pow2</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">window_size</span><span class="p">))))</span>
+
+<span class="c"># This function returns an array of frequency values in Hz which indicate</span>
+<span class="c"># the centre frequency of each bin in the positive part of the spectrum</span>
+<span class="c"># for a given fft size and sample rate</span>
+<span class="n">get_freq_bins</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">fft_size</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">fft_size</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span> <span class="o">*</span> \
+    <span class="nb">float</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">)</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">fft_size</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="LoudnessAnalyser"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.LoudnessAnalyser">[docs]</a><span class="k">class</span> <span class="nc">LoudnessAnalyser</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="n">hop_size</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">window_size</span> <span class="o">=</span> <span class="n">window_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fft_size</span> <span class="o">=</span> <span class="n">next_pow2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hop_size</span> <span class="o">=</span> <span class="n">hop_size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">window</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hamming</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LoudnessAnalyser.get_loudness"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.LoudnessAnalyser.get_loudness">[docs]</a>    <span class="k">def</span> <span class="nf">get_loudness</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        
+        <span class="c"># Read in the file and extract samples, sample rate and format</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="p">(</span><span class="n">audio_data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">file_format</span><span class="p">)</span> <span class="o">=</span> <span class="n">wavread</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        
+        <span class="c"># Set the low band and build our logarithmic frequency ranges up as</span>
+        <span class="c"># far as the Nyquist.</span>
+        <span class="n">lowband</span> <span class="o">=</span> <span class="mf">100.0</span>
+        <span class="n">no_bands</span> <span class="o">=</span> <span class="mf">8.0</span>
+        <span class="n">freq_bands</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>\
+            <span class="n">lowband</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span><span class="o">/</span><span class="mf">2.0</span><span class="o">/</span><span class="n">lowband</span><span class="p">),</span> \
+                <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">no_bands</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">no_bands</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+        <span class="p">))</span>
+        <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Freq_bands: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">freq_bands</span> <span class="p">)</span>
+        <span class="c"># Define a function to calculate the energy</span>
+        <span class="n">calc_energy</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">mag</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">mag</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+        
+        <span class="c"># Get centre frequency of each bin in Hz    </span>
+        <span class="n">freq_bins</span> <span class="o">=</span> <span class="n">get_freq_bins</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fft_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        <span class="c"># Create a container for the value in each band at each hop and then..</span>
+        <span class="c"># loop!</span>
+        <span class="n">energy_bands</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">audio_data</span><span class="p">)</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">hop_size</span><span class="p">,</span> <span class="n">no_bands</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s">&#39;single&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">frame</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_frames</span><span class="p">(</span><span class="n">audio_data</span><span class="p">)):</span>
+            <span class="n">fft_frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+            <span class="n">mag</span> <span class="o">=</span> <span class="n">pos_spec</span><span class="p">(</span><span class="n">fft_frame</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;single&#39;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">ind</span><span class="p">,</span> <span class="n">freq</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">freq_bands</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">ind</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">prev_freq</span> <span class="o">=</span> <span class="n">freq</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c">#print &quot;Calculating energy of band: %f to %f&quot; \</span>
+                        <span class="c">#% (prev_freq, freq)</span>
+                    <span class="n">energy_bands</span><span class="p">[</span><span class="n">index</span><span class="p">,</span> <span class="n">ind</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> \
+                        <span class="n">calc_energy</span><span class="p">(</span><span class="n">find_mags</span><span class="p">(</span><span class="n">mag</span><span class="p">,</span> <span class="n">freq_bins</span><span class="p">,</span> <span class="n">prev_freq</span><span class="p">,</span> <span class="n">freq</span><span class="p">))</span>
+                    <span class="n">prev_freq</span> <span class="o">=</span> <span class="n">freq</span>
+        
+        <span class="c">#Take the log of the energy values            </span>
+        <span class="n">energy</span> <span class="o">=</span> <span class="mi">10</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">energy_bands</span> <span class="o">+</span> <span class="mf">0.0001</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">energy</span>
+</div>
+<div class="viewcode-block" id="LoudnessAnalyser.get_frames"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.LoudnessAnalyser.get_frames">[docs]</a>    <span class="k">def</span> <span class="nf">get_frames</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; </span>
+<span class="sd">            Generator function to return frames of the audio. </span>
+<span class="sd">            Only yield complete frames. No zero padding. We ditch</span>
+<span class="sd">            leftover samples that can&#39;t fill a frame.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">frame_begin</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">audio_data</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">hop_size</span><span class="p">):</span>
+            <span class="n">frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">audio_data</span><span class="p">[</span><span class="n">frame_begin</span><span class="p">:</span><span class="n">frame_begin</span><span class="o">+</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="p">])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="p">:</span> <span class="c"># Ignore leftover samples. Who cares...</span>
+                <span class="k">yield</span> <span class="n">frame</span>
+            </div>
+<div class="viewcode-block" id="LoudnessAnalyser.fft"><a class="viewcode-back" href="../../index.html#hmosaic.analyse.LoudnessAnalyser.fft">[docs]</a>    <span class="k">def</span> <span class="nf">fft</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">audio_frame</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Generates frames of raw fft&#39;ed audio.</span>
+<span class="sd">            Window size is set to self.frame_size so it might be an idea to</span>
+<span class="sd">            set this to 701 or something before calling this function.</span>
+<span class="sd">            The middle sample in the window stays at 0 - is this correct?</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c"># Window the frame</span>
+           
+        
+        <span class="n">win_frame</span> <span class="o">=</span> <span class="n">audio_frame</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">window</span>
+            
+        <span class="c"># Center the frame</span>
+        <span class="n">centred_frame</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="p">)</span>
+            
+        <span class="n">centred_frame</span><span class="p">[</span><span class="mi">0</span><span class="p">:(</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> \
+            <span class="n">win_frame</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">/</span><span class="mi">2</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">centred_frame</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">/</span><span class="mi">2</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> \
+            <span class="n">win_frame</span><span class="p">[</span><span class="mi">0</span><span class="p">:(</span><span class="bp">self</span><span class="o">.</span><span class="n">window_size</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">centred_frame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fft_size</span><span class="p">)</span>
+
+
+</div></div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;TODO - write a script to parameterise the analyser...&quot;</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

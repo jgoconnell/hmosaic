@@ -1,0 +1,480 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.models &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.models</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module contains most of the models used in the framework.</span>
+<span class="sd">This includes **storm** ORM models, as well as quite sophisticated</span>
+<span class="sd">Mosaic models which keep track of their constituent units and can apply </span>
+<span class="sd">global crossfades and timestretching.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+<span class="c"># Third party library imports</span>
+<span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">wavread</span><span class="p">,</span> <span class="n">wavwrite</span>
+<span class="kn">from</span> <span class="nn">storm.locals</span> <span class="kn">import</span> <span class="n">Date</span><span class="p">,</span> <span class="n">Bool</span><span class="p">,</span> <span class="n">Reference</span><span class="p">,</span> <span class="n">Unicode</span><span class="p">,</span> <span class="n">Int</span><span class="p">,</span> <span class="n">Float</span>
+
+<span class="c"># Project imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">secs_to_samps</span><span class="p">,</span> <span class="n">timestretch</span>
+
+<div class="viewcode-block" id="DBSong"><a class="viewcode-back" href="../../index.html#hmosaic.models.DBSong">[docs]</a><span class="k">class</span> <span class="nc">DBSong</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Information about the full source audio files</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">__storm_table__</span> <span class="o">=</span> <span class="s">&quot;song&quot;</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">song_name</span> <span class="o">=</span> <span class="n">Unicode</span><span class="p">()</span>
+    <span class="n">male</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">female</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">vocal</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">instrumental</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+</div>
+<div class="viewcode-block" id="DBSegment"><a class="viewcode-back" href="../../index.html#hmosaic.models.DBSegment">[docs]</a><span class="k">class</span> <span class="nc">DBSegment</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Information about segments drawn from the *DBSongs*</span>
+<span class="sd">        Contains high level analysis data like *male*, *female*</span>
+<span class="sd">        *vocal*, *instrumental*, etc.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">__storm_table__</span> <span class="o">=</span> <span class="s">&quot;segment&quot;</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">song_name</span> <span class="o">=</span> <span class="n">Unicode</span><span class="p">()</span>
+    <span class="n">song</span> <span class="o">=</span> <span class="n">Reference</span><span class="p">(</span><span class="n">song_name</span><span class="p">,</span> <span class="n">DBSong</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+    <span class="n">segment_name</span> <span class="o">=</span> <span class="n">Unicode</span><span class="p">()</span>
+    <span class="n">segment_duration</span> <span class="o">=</span> <span class="n">Int</span><span class="p">()</span>
+    <span class="n">vocal</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">instrumental</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">male</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+    <span class="n">female</span> <span class="o">=</span> <span class="n">Float</span><span class="p">()</span>
+
+
+
+</div>
+<div class="viewcode-block" id="SegmentAudio"><a class="viewcode-back" href="../../index.html#hmosaic.models.SegmentAudio">[docs]</a><span class="k">class</span> <span class="nc">SegmentAudio</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Very simple audio class - encapsulates the following information</span>
+<span class="sd">        about an audio file:</span>
+<span class="sd">        * ``filepath`` - location of original file.</span>
+<span class="sd">        * ``audio_array`` - 32bit floating point array of audio signal.</span>
+<span class="sd">        * ``sample_rate`` - Sampling rate of the audio.</span>
+<span class="sd">        * ``format`` - format of the wav file.</span>
+<span class="sd">        * ``name`` - basename from the filepath</span>
+<span class="sd">        * ``samples`` - number of samples in the array</span>
+<span class="sd">        * ``length`` - Length of the audio in seconds. </span>
+<span class="sd">            </span>
+<span class="sd">        Designed to be used with a segmenter but it is generic enough</span>
+<span class="sd">        to be used elsewhere (or as a base class)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">audio_array</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">)</span> <span class="o">=</span> <span class="n">wavread</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">audio_array</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+
+  </div>
+<div class="viewcode-block" id="Unit"><a class="viewcode-back" href="../../index.html#hmosaic.models.Unit">[docs]</a><span class="k">class</span> <span class="nc">Unit</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This class is also designed to be used with segmenters, it is intended</span>
+<span class="sd">        to be the ``unit`` which is yielded in the ``segment`` routine.</span>
+<span class="sd">        Unlike the SegmentAudio class, this Unit class does not read an audio</span>
+<span class="sd">        file. All parameters are passed to it in the initialiser.</span>
+<span class="sd">        </span>
+<span class="sd">        It stores only the following attributes:</span>
+<span class="sd">        * ``data`` - 32bit floating point array of audio signal.</span>
+<span class="sd">        * ``sample_rate`` - Sampling rate of the audio.</span>
+<span class="sd">        * ``length`` - Length of the audio in seconds. </span>
+<span class="sd">            </span>
+<span class="sd">    &quot;&quot;&quot;</span> 
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Set parameters to be instance attributes for encapsulation</span>
+<span class="sd">            of unit data.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="n">sample_rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">length</span>
+        
+        </div>
+<div class="viewcode-block" id="Mosaic"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic">[docs]</a><span class="k">class</span> <span class="nc">Mosaic</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A Mosaic object containing methods to concatenate units,</span>
+<span class="sd">        crossfade units, persist to disk, play the units, etc.</span>
+<span class="sd">        </span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">units</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">           Can be initialised from a ``filepath`` or from an array of Unit </span>
+<span class="sd">           objects, or with no default audio - an empty container.</span>
+<span class="sd">           If initialised with units or filepath, the data is parsed and </span>
+<span class="sd">           ``self._calculate_metadata`` is called to populate ``Mosaic`` </span>
+<span class="sd">           attributes.</span>
+<span class="sd">           </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">filepath</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">):</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">type_format</span><span class="p">)</span> <span class="o">=</span> <span class="n">wavread</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_metadata</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">samples</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="mi">44100</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="k">elif</span> <span class="n">units</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">=</span> <span class="n">units</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_data</span><span class="p">(</span><span class="n">units</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="mi">44100</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_metadata</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">samples</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="mi">44100</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">None</span>
+            
+<span class="c">###############################################################################</span>
+<span class="c"># PUBLIC FUNCTIONS FOR ADDING, CROSSFADING  AND PLAYING UNITS + SAVING TO DISK</span>
+<span class="c">###############################################################################</span>
+
+        
+<div class="viewcode-block" id="Mosaic.add_unit"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.add_unit">[docs]</a>    <span class="k">def</span> <span class="nf">add_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unit</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Adds a ``unit`` of type ``Unit`` to the Mosaic. &quot;&quot;&quot;</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">silent</span><span class="p">:</span>
+           <span class="n">unit</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">),</span> <span class="s">&#39;single&#39;</span><span class="p">)</span>
+           <span class="n">unit</span><span class="o">.</span><span class="n">recalculate</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_append_data</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        </div>
+<div class="viewcode-block" id="Mosaic.crossfade"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.crossfade">[docs]</a>    <span class="k">def</span> <span class="nf">crossfade</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overlap</span><span class="o">=</span><span class="mi">50</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Apply fade in and FADE OUT AND overlap the results.</span>
+<span class="sd">            </span>
+<span class="sd">            New approach applies a fade to the first and last &#39;overlap&#39; ms.</span>
+<span class="sd">           </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Sample rate is </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Overlap in ms: </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">overlap</span><span class="p">)</span>
+         
+        <span class="n">overlap</span> <span class="o">=</span> <span class="n">secs_to_samps</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">overlap</span><span class="p">)</span><span class="o">/</span><span class="mf">1000.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Overlap in samples is: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">overlap</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">overlap</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c">#self._make_data(unit for unit in self.units)</span>
+            <span class="k">return</span>
+        <span class="n">fadein</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">overlap</span><span class="p">)</span>
+        <span class="n">fadeout</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">overlap</span><span class="p">)</span>
+        <span class="n">new_units</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">unit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">overlap</span><span class="p">:</span>
+                <span class="n">overlap</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Overlap too large - </span><span class="si">%d</span><span class="s"> , using length of unit instead: </span><span class="si">%s</span><span class="s">&quot;</span> 
+                    <span class="o">%</span> <span class="p">(</span><span class="n">overlap</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">)))</span>
+            <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span><span class="n">overlap</span><span class="p">]</span> <span class="o">=</span> <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span><span class="n">overlap</span><span class="p">]</span> <span class="o">*</span> <span class="n">fadein</span>
+            <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="n">overlap</span><span class="p">:]</span> <span class="o">=</span> <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="n">overlap</span><span class="p">:]</span> <span class="o">*</span> <span class="n">fadeout</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">new_units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DataUnit</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">new_units</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="o">-</span><span class="n">overlap</span><span class="p">:]</span> <span class="o">+=</span> <span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span><span class="n">overlap</span><span class="p">]</span>
+                <span class="n">new_units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DataUnit</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">overlap</span><span class="p">:]))</span>
+            <span class="c">#win = np.hamming(len(unit.data))</span>
+            <span class="c">#new_units.append(DataUnit(unit.data*win))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_data</span><span class="p">(</span><span class="n">new_units</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="Mosaic.normalise"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.normalise">[docs]</a>    <span class="k">def</span> <span class="nf">normalise</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor</span><span class="o">=</span><span class="mf">0.99</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Normalise the data array and scale by ``factor``</span>
+<span class="sd">            This operation acts on the ``data`` attribute of the mosaic, so</span>
+<span class="sd">            it should be performed after crossfading and timestretching.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Normalising audio and scaling by a factor of: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">factor</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">/</span><span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">))</span>
+</div>
+<div class="viewcode-block" id="Mosaic.timestretch"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.timestretch">[docs]</a>    <span class="k">def</span> <span class="nf">timestretch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">crossfade</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Timestretch each unit to match the given length (in ms).</span>
+<span class="sd">        If ``crossfade`` is not **None** then take the crossfade</span>
+<span class="sd">        into account for the stretch. This function uses the **Rubberband**</span>
+<span class="sd">        timestretching library. If the stretch is extreme then the sound may</span>
+<span class="sd">        be extremely degraded.</span>
+<span class="sd">        For each unit - we write it to an audiofile, perform the timestretch and</span>
+<span class="sd">        read back in the audio file and then we crossfade.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">new_units</span> <span class="o">=</span> <span class="p">[]</span>
+            
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">unit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">crossfade</span><span class="p">:</span>
+                <span class="n">length</span> <span class="o">+=</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">crossfade</span><span class="p">)</span><span class="o">/</span><span class="mf">1000.0</span><span class="p">)</span><span class="o">/</span><span class="mf">2.0</span>
+            <span class="n">new_unit</span> <span class="o">=</span> <span class="n">timestretch</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+            <span class="n">new_units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_unit</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">units</span> <span class="o">=</span> <span class="n">new_units</span>
+        <span class="k">if</span> <span class="n">crossfade</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">crossfade</span><span class="p">(</span><span class="n">crossfade</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">)</span>
+            
+            
+        
+        </div>
+<div class="viewcode-block" id="Mosaic.persist"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.persist">[docs]</a>    <span class="k">def</span> <span class="nf">persist</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;   </span>
+<span class="sd">            Saves the mosaic to that location on disk indicated by</span>
+<span class="sd">            the `filepath` parameter. </span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">filepath</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="n">wavwrite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        </div>
+<div class="viewcode-block" id="Mosaic.play"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.play">[docs]</a>    <span class="k">def</span> <span class="nf">play</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Convenience wrapper for the ``play`` function, imported as </span>
+<span class="sd">            ``play_array`` from ``scikits.audiolab``</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">play</span> <span class="k">as</span> <span class="n">play_array</span>
+        <span class="n">play_array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        
+<span class="c">###############################################################################</span>
+<span class="c"># PRIVATE SIGNAL PROCESSING FUNCTIONS.</span>
+<span class="c">###############################################################################</span>
+               </div>
+    <span class="k">def</span> <span class="nf">_append_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Appends a new unit&#39;s signal data into the Mosaic&#39;s signal data. &quot;&quot;&quot;</span>
+    
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">new_data</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="nb">tuple</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">new_data</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_calculate_metadata</span><span class="p">()</span>
+        
+    <span class="k">def</span> <span class="nf">_make_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">units</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns a concatenated array containing all the signal from</span>
+<span class="sd">            all the units.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="nb">tuple</span><span class="p">([</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span> <span class="k">for</span> <span class="n">unit</span> <span class="ow">in</span> <span class="n">units</span><span class="p">]))</span>
+        
+    <span class="k">def</span> <span class="nf">_calculate_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the following attributes:</span>
+<span class="sd">            * ``samples`` - number of samples in the Mosaic</span>
+<span class="sd">            * ``length`` - Length of the audio in seconds. </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">samples</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        
+    
+    
+    
+            
+<span class="c">###############################################################################</span>
+<span class="c"># UNUSED OR RARELY USED FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+            
+<div class="viewcode-block" id="Mosaic.merge_mosaics"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.merge_mosaics">[docs]</a>    <span class="k">def</span> <span class="nf">merge_mosaics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mosaic</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Accepts a ``mosaic`` of type ``Mosaic`` as a parameter and merges</span>
+<span class="sd">            the units from this mosaic into the current one.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">unit</span> <span class="ow">in</span> <span class="n">mosaic</span><span class="o">.</span><span class="n">units</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            </div>
+<div class="viewcode-block" id="Mosaic.add_audio_samples"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.add_audio_samples">[docs]</a>    <span class="k">def</span> <span class="nf">add_audio_samples</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Public accessor method for the private ``self._append_data``</span>
+<span class="sd">            function.</span>
+<span class="sd">            Allows arrays of sample data to be added directly to the mosaic.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_append_data</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        </div>
+<div class="viewcode-block" id="Mosaic.export"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.export">[docs]</a>    <span class="k">def</span> <span class="nf">export</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Exports the mosaic to the given ``filepath``</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">wavwrite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        </div>
+<div class="viewcode-block" id="Mosaic.play_units"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.play_units">[docs]</a>    <span class="k">def</span> <span class="nf">play_units</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">no_units</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">start_unit</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Convenience method to create and play a submosaic in one function</span>
+<span class="sd">            call.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">play</span> <span class="k">as</span> <span class="n">play_array</span>
+        <span class="n">play_array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_make_data</span><span class="p">(</span>\
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_submosaic</span><span class="p">(</span><span class="n">no_units</span><span class="p">,</span> <span class="n">start_unit</span><span class="p">)))</span>
+            </div>
+<div class="viewcode-block" id="Mosaic.create_submosaic"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.create_submosaic">[docs]</a>    <span class="k">def</span> <span class="nf">create_submosaic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">no_units</span><span class="p">,</span> <span class="n">start_unit</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Create a submosaic starting from the given ``start_unit``,</span>
+<span class="sd">            with a length of ``no_units``.</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">no_units</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">start_unit</span> <span class="o">+</span> <span class="n">no_units</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">):</span>
+                <span class="n">no_units</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">)</span> <span class="k">if</span> <span class="n">start_unit</span> <span class="o">==</span> <span class="mi">0</span> \
+                    <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">)</span> <span class="o">-</span> <span class="n">start_unit</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">[</span><span class="n">start_unit</span><span class="p">:</span><span class="n">no_units</span><span class="o">+</span><span class="n">start_unit</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">units</span><span class="p">)</span>
+        </div>
+<div class="viewcode-block" id="Mosaic.get_submosaic"><a class="viewcode-back" href="../../index.html#hmosaic.models.Mosaic.get_submosaic">[docs]</a>    <span class="k">def</span> <span class="nf">get_submosaic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">no_units</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">start_unit</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Convenience method to get a submosaic.</span>
+<span class="sd">           </span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">Mosaic</span><span class="p">(</span><span class="n">units</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_submosaic</span><span class="p">(</span><span class="n">no_units</span><span class="p">,</span> <span class="n">start_unit</span><span class="p">))</span>
+        
+        
+</div></div>
+<div class="viewcode-block" id="MosaicUnit"><a class="viewcode-back" href="../../index.html#hmosaic.models.MosaicUnit">[docs]</a><span class="k">class</span> <span class="nc">MosaicUnit</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Another bare bones audio class - practially identical to SegmentAudio,</span>
+<span class="sd">        except that it can be marked as silent, and it can also recalculate </span>
+<span class="sd">        its own properties.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Sets the filepath and calculates the attributes of the ``MosaicUnit``</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">filepath</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">)</span> <span class="o">=</span> <span class="n">wavread</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">samples</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">samples</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">silent</span> <span class="o">=</span> <span class="bp">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">active</span> <span class="o">=</span> <span class="bp">True</span>
+
+<div class="viewcode-block" id="MosaicUnit.recalculate"><a class="viewcode-back" href="../../index.html#hmosaic.models.MosaicUnit.recalculate">[docs]</a>    <span class="k">def</span> <span class="nf">recalculate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            If unit is set to silent then this method should be called.</span>
+<span class="sd">            It recalculates length and no of samples.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">))</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">)</span>
+    </div>
+<div class="viewcode-block" id="MosaicUnit.set_filepath"><a class="viewcode-back" href="../../index.html#hmosaic.models.MosaicUnit.set_filepath">[docs]</a>    <span class="k">def</span> <span class="nf">set_filepath</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            When passed a valid wav file into ``path``, this file</span>
+<span class="sd">            is read and the current data is replaced by this new data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filepath</span> <span class="o">=</span> <span class="n">path</span>
+        <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">)</span> <span class="o">=</span> <span class="n">wavread</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recalculate</span><span class="p">()</span>
+        
+        </div></div>
+<div class="viewcode-block" id="DataUnit"><a class="viewcode-back" href="../../index.html#hmosaic.models.DataUnit">[docs]</a><span class="k">class</span> <span class="nc">DataUnit</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Simplest represenation - just an array of mono signal.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

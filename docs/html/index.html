@@ -1,0 +1,1822 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Overview &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="#" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">hmosaic v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="toctree-wrapper compound">
+<ul class="simple">
+</ul>
+</div>
+<div class="section" id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
+<p>This software was written as part of a master thesis research undertaken at the MTG research group in Pompeu Fabra university in Barcelona. It uses their proprietary closed source analysis and audio matching software libraries which cannot be distributed with this software. My thesis is distributed under a creative commons licence and can be downloaded from <a class="reference external" href="http://mtg.upf.edu/node/2332">here</a>
+If you do not have access to this software you will not be able to use the hierarchical framework described in my thesis.
+Despite this, the software comprises a library of useful functions for building data-driven synthesis software and may prove useful to those getting started with pure data and/or python.</p>
+<p>Here is a <a class="reference external" href="http://www.youtube.com/watch?v=0Q3SMwPAuKM">video</a> demonstrating it&#8217;s usage with the pure data client.</p>
+</div>
+<div class="section" id="installation-instructions">
+<h1>Installation Instructions<a class="headerlink" href="#installation-instructions" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="software-requirements">
+<h2>Software Requirements<a class="headerlink" href="#software-requirements" title="Permalink to this headline">¶</a></h2>
+<p>An easy way to install the python packages listed below is to use <a class="reference external" href="http://www.pip-installer.org/en/latest/installing.html">pip</a>
+There is no need to create a virtualenv. The below modules names (and version numbers) can then be pasted into
+a requirements file and installed in one go as described <a class="reference external" href="http://www.pip-installer.org/en/latest/index.html#requirements-files">in this page</a></p>
+<div class="section" id="mandatory-software">
+<h3>Mandatory Software<a class="headerlink" href="#mandatory-software" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<ul class="simple">
+<li><a class="reference external" href="http://www.python.org/getit/releases/2.6.7/">Python 2.6</a></li>
+<li><a class="reference external" href="http://puredata.info/community/projects/software/pd-extended">pd-extended</a></li>
+<li><a class="reference external" href="http://mtg.upf.edu/technologies/essentia">Essentia</a></li>
+<li>Gaia:</li>
+</ul>
+</blockquote>
+<p><em>Note:</em> You will need access to both the essentia and gaia source code. When compiling, the python wrappers for both libraries must also be installed.
+When you compile the essentia source code a binary streaming_extractor will be created. For more information on this process and all the software requirements please see the documentation for essentia and gaia.
+You will need to copy the streaming_extractor into the analyser directory in the hmosaic source package, along with the entire svm_models directory which comes with the essentia source code.</p>
+</div>
+<div class="section" id="optional-software">
+<h3>Optional Software<a class="headerlink" href="#optional-software" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<ul class="simple">
+<li><a class="reference external" href="http://breakfastquay.com/rubberband/">rubberband</a> - Required for timestretching units to fit the target length (Recommended)</li>
+<li><a class="reference external" href="http://aubio.org/download">aubio</a> - Provides an alternative onset detection scheme to that of Essentia</li>
+<li><a class="reference external" href="http://ffmpeg.org/download.html">ffmpeg</a> (must be compiled with lame mp3 support) - required only for conversion of mp3 files to wav in <tt class="docutils literal"><span class="pre">hmosaic.scripts.convertAudio.execute_mp3_convert</span></tt>.</li>
+</ul>
+</blockquote>
+</div>
+<div class="section" id="mandatory-python-modules">
+<h3>Mandatory Python Modules<a class="headerlink" href="#mandatory-python-modules" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<ul class="simple">
+<li>numpy==1.3.0 - <a class="reference external" href="http://numpy.scipy.org/">http://numpy.scipy.org/</a></li>
+<li>scikits.audiolab==0.11.0 - <a class="reference external" href="http://pypi.python.org/pypi/scikits.audiolab/">http://pypi.python.org/pypi/scikits.audiolab/</a></li>
+<li>PyYAML==3.09 - <a class="reference external" href="http://pyyaml.org/download/pyyaml/">http://pyyaml.org/download/pyyaml/</a></li>
+<li>pyOSC==0.3.5b-5294 - <a class="reference external" href="http://pypi.python.org/pypi/pyOSC/0.3.5b-5294">http://pypi.python.org/pypi/pyOSC/0.3.5b-5294</a></li>
+<li>SimpleOSC==0.3 - <a class="reference external" href="http://www.ixi-software.net/content/body_backyard_osc.html">http://www.ixi-software.net/content/body_backyard_osc.html</a></li>
+</ul>
+</blockquote>
+<p><em>Note:</em> Before installing scikits.audiolab on linux you should make sure that you have the alsa dev libraries installed and also <a class="reference external" href="http://www.mega-nerd.com/libsndfile/">libsndfile</a></p>
+</div>
+<div class="section" id="optional-python-modules">
+<h3>Optional Python Modules<a class="headerlink" href="#optional-python-modules" title="Permalink to this headline">¶</a></h3>
+<blockquote>
+<ul class="simple">
+<li>storm==0.15 - <a class="reference external" href="https://storm.canonical.com/">https://storm.canonical.com/</a></li>
+<li>matplotlib==0.99.1.1 - <a class="reference external" href="http://matplotlib.sourceforge.net/users/installing.html">http://matplotlib.sourceforge.net/users/installing.html</a></li>
+<li>Sphinx==1.0.5 - <a class="reference external" href="http://sphinx.pocoo.org/">http://sphinx.pocoo.org/</a></li>
+</ul>
+</blockquote>
+<p><em>Note:</em> Sphinx is required only in order to generate the documentation, the other modules are used by some of the experiment running and plotting examples in hmosaic.scripts.</p>
+</div>
+</div>
+<div class="section" id="installing-the-package">
+<h2>Installing the Package<a class="headerlink" href="#installing-the-package" title="Permalink to this headline">¶</a></h2>
+<p>This software has only been tested on linux (ubuntu 10.04). As such, a dedicated cross platform installer is not provided.
+In order for python to be able to find this package the installation directory ought to be added to your Python search path. The installation directory is whatever folder the source package was unzipped into.
+In order to see which directories are currently on the Python search path launch the Python interpreter and type the following:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">sys</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sys</span><span class="o">.</span><span class="n">path</span>
+</pre></div>
+</div>
+<p>You will see a list of all the directories in which python looks for modules.
+An easy way to permanently add this package to that search path is to create a <tt class="docutils literal"><span class="pre">.pth</span></tt> file in the dist-packages directory.
+On my system this was in</p>
+<div class="highlight-python"><pre>/usr/local/lib/python2.6/dist-packages</pre>
+</div>
+<p>The <tt class="docutils literal"><span class="pre">.pth</span></tt> file can be called anything you like e.g. <tt class="docutils literal"><span class="pre">hmosaic.pth</span></tt> and it should contain the full filepath to the directory containing the source code. So, if you unpacked the folder in <tt class="docutils literal"><span class="pre">/home/user/mosaicing</span></tt> then this is the path you should add to the .pth file.
+In this way you run the code from a python interpreter irrespective of which directory you are in at the time.</p>
+</div>
+<div class="section" id="configuring-the-package">
+<h2>Configuring the Package<a class="headerlink" href="#configuring-the-package" title="Permalink to this headline">¶</a></h2>
+<p>The settings.py file is where the module ought to be configured.
+The following settings must be filled in:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">TARGET_REPO</span> <span class="o">=</span> <span class="s">&#39;&lt;path to directory to be used for segmenting and analysing targets&gt;&#39;</span>
+<span class="n">SOURCE_REPO</span> <span class="o">=</span> <span class="s">&#39;&lt;path to directory containing source corpora&gt;&#39;</span>
+</pre></div>
+</div>
+<p>Everything else is optional, check the settings.py file for more details.
+Each group of settings is commented.</p>
+</div>
+<div class="section" id="testing-the-installation">
+<h2>Testing the Installation<a class="headerlink" href="#testing-the-installation" title="Permalink to this headline">¶</a></h2>
+<p>Open a commandline terminal and navigate to the hmosaic directory. Execute the control process by typing:</p>
+<div class="highlight-python"><pre>python control.py</pre>
+</div>
+<p>If all is well you should see a message informing you that the <tt class="docutils literal"><span class="pre">Logging</span> <span class="pre">system</span> <span class="pre">is</span> <span class="pre">set</span> <span class="pre">up</span></tt></p>
+<p>Launch pure data and open <tt class="docutils literal"><span class="pre">hmosaic/puredata/mainGUI.pd</span></tt></p>
+<p>Check the connect box in the control panel and try selecting a corpus. You should see logging information
+confirming your corpus selection in the terminal window.</p>
+<p>This video shows how to install the source package into the python path and create a mosaic using the ipython python interpreter</p>
+</div>
+</div>
+<div class="section" id="tour-of-the-pure-data-mosaicing-framework">
+<h1>Tour of the pure data mosaicing framework<a class="headerlink" href="#tour-of-the-pure-data-mosaicing-framework" title="Permalink to this headline">¶</a></h1>
+<p>All of the pure data patches are contained in the <tt class="docutils literal"><span class="pre">puredata</span></tt> folder</p>
+<ul class="simple">
+<li>hl_main_gui.pd</li>
+<li>hl_control.pd</li>
+<li>hl_target.pd</li>
+<li>hl_mosaic.pd</li>
+<li>ll_descriptors.pd</li>
+<li>hl_similarity.pd</li>
+<li>corpus_control.pd</li>
+<li>ll_settings.pd</li>
+<li>hl_labels.pd</li>
+<li>hl_sequencer_buffer.pd</li>
+<li>hl_sequencer_row.pd</li>
+</ul>
+<p>The main patch is <tt class="docutils literal"><span class="pre">hl_main_gui.pd</span></tt> - This patch loads all the other patches as sub-patches.
+The following tour of the framework&#8217;s functionality has been adapted from my <a class="reference external" href="http://mtg.upf.edu/node/2332">thesis</a></p>
+<div class="section" id="control-gui">
+<h2>Control GUI<a class="headerlink" href="#control-gui" title="Permalink to this headline">¶</a></h2>
+<img alt="_images/ControlGUI.png" src="_images/ControlGUI.png" />
+<p>This gui abstraction conceals all the message sending logic for the gui framework. All framework applications send global messages here to be routed to the Python daemon via OSC.
+It also receives response messages from the Python daemon and routes them to the correct application.
+This module contains a control for adjusting the volume of the target and the mosaic and a button to allow their chorusing, in order to hear how well the target and mosaic sound layered on top of each other.
+There is also a button labelled <tt class="docutils literal"><span class="pre">Save</span> <span class="pre">Mosaic</span></tt> which saves, not only the mosaic, but the target, onset marked target and an informational text file containing the current state of the OSCControl object, all settings are written here. This functionality was included for research purposes, i.e. to be able to see which parameters created a particular effect.
+Overall DSP audio control is also provided in this gui.</p>
+</div>
+<div class="section" id="corpus-selection">
+<h2>Corpus selection<a class="headerlink" href="#corpus-selection" title="Permalink to this headline">¶</a></h2>
+<div class="figure">
+<img alt="_images/CorpusGUI.png" src="_images/CorpusGUI.png" />
+</div>
+<p>Choose a corpus of source material with which to mosaic. A corpus can also be re-analysed, based on a specific segmentation scheme (e.g. <tt class="docutils literal"><span class="pre">'onsets'</span></tt> or <tt class="docutils literal"><span class="pre">500</span></tt> or <tt class="docutils literal"><span class="pre">1000</span></tt>) derived from the global parameters set in the SegmentationGui. This is not recommended as it is <strong>very slow</strong>. New source corpora must be added manually to this module.</p>
+</div>
+<div class="section" id="segmentation">
+<h2>Segmentation<a class="headerlink" href="#segmentation" title="Permalink to this headline">¶</a></h2>
+<img alt="_images/SegmenterGUI.png" src="_images/SegmenterGUI.png" />
+<p>With this patch one can test the segmentation of target and set global segmentation parameters.</p>
+<p>The settings here are utilised, not only to perform the segmentation of the incoming target audio, but also to determine which segmentation scheme of the selected corpus will be (re)analysed if the user selects the <tt class="docutils literal"><span class="pre">Analyse</span></tt> option in the Corpus Gui.</p>
+<p>The most important use of the segmenter is to preview the effects of different segmentation schemes on the target. In this respect it could be considered a mini application in its own right. The calculation of onsets using either aubio or essentia is supported, as is basic fixed length segmentation (which requires no analysis), and bpm based segmentation.</p>
+<p>The <tt class="docutils literal"><span class="pre">Mark</span> <span class="pre">Audio</span></tt> button takes the target, analyses it (according to the selected segmentation scheme) and marks the audio file with beeps where it will be cut. This allows the user to preview the accuracy of the selected segmentation scheme, adjust its parameters, preview the results and readjust or choose another segmentation scheme, etc. When the user is satisfied that the target has been marked correctly, the <tt class="docutils literal"><span class="pre">Reprocess</span> <span class="pre">Target</span></tt> button can be pressed in order to re-segment the target, according to the newly selected scheme.</p>
+<p>The available segmentation schemes are described below:</p>
+<div class="section" id="aubio-note-segmentation">
+<h3>Aubio Note Segmentation<a class="headerlink" href="#aubio-note-segmentation" title="Permalink to this headline">¶</a></h3>
+<p>In aubio mode, the command line utility <a class="reference external" href="http://aubio.org/aubionotes.html">aubionotes</a> is used and the <tt class="docutils literal"><span class="pre">minimum</span> <span class="pre">note</span> <span class="pre">length</span></tt> parameter is used to afford the user a measure of control over the granularity of the onsets, e.g. if they wish to count a very fast trill as just one note instead of many notes, the <tt class="docutils literal"><span class="pre">minimum</span> <span class="pre">note</span> <span class="pre">length</span></tt> parameter can enable them to achieve this.</p>
+</div>
+<div class="section" id="essentia-onsets-segmentation">
+<h3>Essentia Onsets Segmentation<a class="headerlink" href="#essentia-onsets-segmentation" title="Permalink to this headline">¶</a></h3>
+<p>In essentia mode, the following descriptors are calculated for each frame of target audio:</p>
+<p>Onset detection descriptors</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="27%" />
+<col width="73%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Name</th>
+<th class="head">Description</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>High Frequency Content (HFC)</td>
+<td>Calculates the high frequency content of the spectrum as in <a class="reference internal" href="#masri">[Masri]</a></td>
+</tr>
+<tr><td>Complex Domain</td>
+<td>Detects changes in both energy and phase for each frame of the signal</td>
+</tr>
+<tr><td>Root Mean Square (RMS)</td>
+<td>Can be thought of as representing the energy in each frame</td>
+</tr>
+</tbody>
+</table>
+<p>Research has shown that combinations of HFC (good for percussive events) and Complex (good for reacting to more tonal onsets) perform better than an approach utilising only one or the other - Bello04. It is with this in mind, that we allow the user to pick any combination of these 3 features and a weighting for each feature selected. This is submitted to the OnsetDetection algorithm in essentia which picks the peaks and returns onset times.</p>
+</div>
+<div class="section" id="bpm-based-segmentation">
+<h3>BPM based segmentation<a class="headerlink" href="#bpm-based-segmentation" title="Permalink to this headline">¶</a></h3>
+<p>In this scheme, the target is first analysed, and the BPM is extracted.
+From the BPM, it is trivial to calculate the <tt class="docutils literal"><span class="pre">beat</span></tt> length in milliseconds.
+e.g. providing the BPM of the target is fairly constant, this method of segmentation approximates the pace of the original, so the mosaics sound more <tt class="docutils literal"><span class="pre">in</span> <span class="pre">sync</span></tt> with the target.</p>
+<p>One problem with this approach is that the BPM beat length is rarely 500ms or 1000ms or 1250ms. This raises an issue where it may be difficult to find enough different onsets of the same length in the source corpus. The solution was to introduce a length tracking mechanism (as discussed in Settings, Transformations and Tracking below). Initially, the time stretching approach alone was employed, however the deterioration in quality of the audio can be very noticeable in places, especially if the stretch is large. For this reason, a second mode of length constraint satisfaction was devised which simply cuts the sound to make it shorter, or pads it with silence to make it longer.</p>
+</div>
+<div class="section" id="fixed-length-segmentation">
+<h3>Fixed Length segmentation<a class="headerlink" href="#fixed-length-segmentation" title="Permalink to this headline">¶</a></h3>
+<p>This is the simplest scheme. The user picks between 500ms, 1000ms and 1250ms and the audio is segmented into equal size pieces. any left over samples are discarded.</p>
+</div>
+</div>
+<div class="section" id="similarity-search">
+<h2>Similarity Search<a class="headerlink" href="#similarity-search" title="Permalink to this headline">¶</a></h2>
+<img alt="_images/NewSimilarityGUI.png" src="_images/NewSimilarityGUI.png" />
+<p>Select descriptors and corresponding weights to utilise when searching the source corpus for matching units.</p>
+<p>When mosaicing, each of the target units is input into the similarity search module, in order to find the most similar units.
+The similarity search gui, shown above is split across two panels. The high level similarity search is used to match high level chunks of audio of length greater than or equal to the chosen time resolution (5 seconds). The low level similarity search is then used to search for similar units within the pool of defined low level segments (which may be of a fixed length or variable length (based on onsets)).
+This gui allows the user to select descriptors and weights. From each descriptor a euclidean distance measure is used to find the most similar units to it. The weights are then used to create a linear combination of euclidean distances, where the weight determines the importance attached to that particular descriptor when searching for similar units.
+The high-level descriptor weighting is used to search for longer segments, while the low-level descriptor weighting is used to search through the smaller source units comprising each segment.</p>
+<p>Similarity Search: Summary of Low level Descriptors</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="21%" />
+<col width="79%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Descriptor</th>
+<th class="head">Summary</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Length</td>
+<td>The duration of the audio</td>
+</tr>
+<tr><td>Spectral Flatness</td>
+<td>An indication of percussivity in the Spectrum  <a class="reference internal" href="#peeters">[Peeters]</a></td>
+</tr>
+<tr><td>Spectral RMS</td>
+<td>The root mean square of the signal calculated in the frequency domain.</td>
+</tr>
+<tr><td>Spectral Centroid</td>
+<td>The barycenter of the spectrum  <a class="reference internal" href="#peeters">[Peeters]</a></td>
+</tr>
+<tr><td>Spectral Spread</td>
+<td>The spread of the spectrum around the centroid  <a class="reference internal" href="#peeters">[Peeters]</a></td>
+</tr>
+<tr><td>Spectral Decrease</td>
+<td>Similar to Spectral Rolloff as described in <a class="reference internal" href="#peeters">[Peeters]</a></td>
+</tr>
+<tr><td>Spectral Flux</td>
+<td>A measure of the overall, frame by frame, change in magnitude of the frequency bins <a class="reference internal" href="#dixon">[Dixon]</a></td>
+</tr>
+<tr><td>Spectral Energy</td>
+<td>Another measure of the energy of the signal calculated in the frequency domain.</td>
+</tr>
+<tr><td>Zero Crossing Rate</td>
+<td>A measure of how often the signal crosses the zero axis <a class="reference internal" href="#peeters">[Peeters]</a></td>
+</tr>
+<tr><td>Pitch</td>
+<td>An estimation of the fundamental frequency of the spectrum</td>
+</tr>
+<tr><td>Spectral Contrast</td>
+<td>A modified version <a class="reference internal" href="#akkermans">[Akkermans]</a> of the Octave Based Spectral Contrast feature described in <a class="reference internal" href="#lu">[Lu]</a></td>
+</tr>
+<tr><td>HPCP</td>
+<td>The tone chroma of the audio signal as described in <a class="reference internal" href="#gomez">[Gomez]</a></td>
+</tr>
+<tr><td>MFCC</td>
+<td>Calculates the coefficients of the mel-frequency cepstrum(MFCC-FB40 implementation) <a class="reference internal" href="#ganchev">[Ganchev]</a></td>
+</tr>
+<tr><td>Barkbands</td>
+<td>Divides the frequency range into perceptually derived bands and calculates the energy for each.</td>
+</tr>
+</tbody>
+</table>
+<p>All of the high level descriptors mentioned involve the use of libsvm, which precludes their realtime calculation.</p>
+<p>For more information on how these descriptors are calculated, the interested reader is referred to Wack2010} or cite{Laurier2009} for more specific details on the mood descriptors.</p>
+<p>Similarity Search: Summary of High level descriptors</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="15%" />
+<col width="85%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Descriptor</th>
+<th class="head">Summary</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Happiness</td>
+<td>A single value describing the happiness of the analysed music <a class="reference internal" href="#laurier">[Laurier]</a></td>
+</tr>
+<tr><td>Sadness</td>
+<td>A single value describing the sadness of the analysed music  <a class="reference internal" href="#laurier">[Laurier]</a></td>
+</tr>
+<tr><td>Relaxedness</td>
+<td>A single value describing the relaxedness of the analysed music <a class="reference internal" href="#laurier">[Laurier]</a></td>
+</tr>
+<tr><td>Aggressiveness</td>
+<td>A single value describing the aggressiveness of the analysed music <a class="reference internal" href="#laurier">[Laurier]</a></td>
+</tr>
+<tr><td>Male</td>
+<td>A single value describing the probability of the male gender in the audio <a class="reference internal" href="#wack">[Wack]</a></td>
+</tr>
+<tr><td>Female</td>
+<td>A single value describing the probability of the female gender in the audio <a class="reference internal" href="#wack">[Wack]</a></td>
+</tr>
+<tr><td>Instrumental</td>
+<td>A single value describing the probability that the audio is instrumental <a class="reference internal" href="#bogdanov">[Bogdanov]</a></td>
+</tr>
+<tr><td>Vocal</td>
+<td>A single value describing the probability that the audio is vocal <a class="reference internal" href="#bogdanov">[Bogdanov]</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="settings-transformations-and-tracking">
+<h2>Settings, Transformations and Tracking<a class="headerlink" href="#settings-transformations-and-tracking" title="Permalink to this headline">¶</a></h2>
+<img alt="_images/NewSettings.png" src="_images/NewSettings.png" />
+<p>Track certain properties of the target and implement global settings affecting unit search
+and unit selection.</p>
+<p>This gui is split into two sections</p>
+<ol class="arabic simple">
+<li>Target Tracking</li>
+<li>Settings</li>
+</ol>
+<div class="section" id="target-tracking">
+<h3>Target Tracking<a class="headerlink" href="#target-tracking" title="Permalink to this headline">¶</a></h3>
+<p>Three different target tracking mechanisms have been implemented:</p>
+<p><tt class="docutils literal"><span class="pre">Key</span></tt> is another semantic descriptor, the idea is to choose units in the same key as the target and keep the whole thing semantically linked. As <tt class="docutils literal"><span class="pre">key</span></tt> is a label (i.e. F#, A, etc.), the problem of not having enough source units to find one matching the target key must   be contended with. Similarly there may be too few source units of a particular key, such that units get repeatedly selected, which can sound jarring.
+These selection problems are not as pronounced as for <tt class="docutils literal"><span class="pre">scale</span></tt> where the target unit will have one or two values - major or minor. This is a much broader classification than <tt class="docutils literal"><span class="pre">key</span></tt>, where many different values are available.
+Both <tt class="docutils literal"><span class="pre">key</span></tt> and <tt class="docutils literal"><span class="pre">scale</span></tt> thresholds apply only during the high level unit selection process.</p>
+<p>The <tt class="docutils literal"><span class="pre">track</span> <span class="pre">length</span></tt> feature stemmed from repeated use of the length descriptor as the highest weighted feature in similarity search during testing. It was felt that the unit length was so important for maintaining some kind of temporal/rhythmic identity with the target, that it should be treated separately. Using the <tt class="docutils literal"><span class="pre">track</span> <span class="pre">length</span></tt> feature affixes the source unit to a grid based on the target&#8217;s bpm.</p>
+<p>Depending on the selected mode, units which do not exactly fit, will be either time-stretched or padded with silence or simply cut.
+The time-stretching functionality is provided by the <a class="reference external" href="http://breakfastquay.com/rubberband/">rubberband</a> commandline utility.
+which is an open-source phase vocoder implementation providing time-stretching and pitch-shifting.</p>
+</div>
+<div class="section" id="settings">
+<h3>Settings<a class="headerlink" href="#settings" title="Permalink to this headline">¶</a></h3>
+<p>The settings application is where control over the concatenation algorithm is proffered. The user can toggle high level mosaicing on or off and also choose a crossfade time in milliseconds for overlapping the units and eliminating concatenation artefacts caused by sudden changes in energy and/or phase between adjacent units in the mosaic. High level scope indicates how many of the closest matching source segments are included in order to generate the pool of available units for the low level search process. Low level scope indicates how many low level unit search results are returned. This could have an impact if the results are processed by either or both of the two cost functions which may reorder the results. Both cost functions can be activated/deactivated from this settings module.
+<tt class="docutils literal"><span class="pre">Unit</span> <span class="pre">Context</span></tt> is a cost based on how similar each low level result is to the other low level results (based on the low level search parameters).
+<tt class="docutils literal"><span class="pre">Repeat</span> <span class="pre">Cost</span></tt> is a cost which penalises those units which are repeatedly selected. It can be useful in situations where the same unit is getting repeatedly selected to the extent that the mosaic sounds like a broken record.</p>
+</div>
+</div>
+<div class="section" id="mosaic-looper">
+<h2>Mosaic Looper<a class="headerlink" href="#mosaic-looper" title="Permalink to this headline">¶</a></h2>
+<img alt="_images/PDLooper.png" src="_images/PDLooper.png" />
+<p>This mini-application is used to build mosaic-augmented loops</p>
+<p>This patch was an extension of the framework, made in order to experiment with composition and music-making with mosaics.
+The inspiration was the <a class="reference external" href="http://www.steinberg.net/en/products/apps_sounds_accessories/loopmash.html">Loopmash</a> project where the user can create layers of mosaics in a loop playing in real time.
+The pure data 4 track looper shown above is a crude imitation, but with the chosen targets pre-segmented and pre-analysed it proved to be quite a lot of fun to use.</p>
+<p>It allows the user to control:</p>
+<blockquote>
+<ul class="simple">
+<li>3 mosaics playing in real time with the target</li>
+<li>Mosaics can be muted and unmuted in real time and can also be played individually.</li>
+<li>New mosaics can be processed in the background and copied to the looper when ready or auditioned to see how they fit with the rest of the audio.</li>
+<li>Using the &#8216;Record&#8217; function a portion of the mosaic can be copied into a buffer whilst looping audio.</li>
+</ul>
+</blockquote>
+<p>Like Loopmash it worked well with drumloops, it is possible to augment them, creating heavy syncopated beats, reminiscent of dubstep or wonky hiphop, etc.</p>
+<p>An example video of the looper in action can be seen <a class="reference external" href="http://www.youtube.com/watch?v=0Q3SMwPAuKM">here</a></p>
+<p>The current implementation is just a proof of concept, and there are glitches in the audio when loading new mosaics from disk or using the record function (as can be heard in the video). These errors would have to be resolved in order to make this looper a useful tool, however the promise of this paradigm is evident, not only for composition but even for live performance.
+Unfortunately, the hierarchical model did not allow the same level of spontaneity and fun as the analysis takes too long.</p>
+</div>
+<div class="section" id="references">
+<h2>References<a class="headerlink" href="#references" title="Permalink to this headline">¶</a></h2>
+<table class="docutils citation" frame="void" id="masri" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[Masri]</a></td><td></td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="16">
+<li>Masri and A. Bateman, Improved Modelling of Attack Transients in Music Analysis-Resynthesis, proceedings of International Computer Music Conference (ICMC), (Hong Kong), pp. 100-103, 1996.</li>
+</ol>
+<table class="docutils citation" frame="void" id="peeters" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[Peeters]</td><td><em>(<a class="fn-backref" href="#id2">1</a>, <a class="fn-backref" href="#id3">2</a>, <a class="fn-backref" href="#id4">3</a>, <a class="fn-backref" href="#id5">4</a>, <a class="fn-backref" href="#id7">5</a>)</em> </td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="7">
+<li>Peeters, A large set of audio features for sound description (similarity and classification) in the CUIDADO project, tech. rep., IRCAM, 2004.</li>
+</ol>
+<table class="docutils citation" frame="void" id="dixon" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[Dixon]</a></td><td></td></tr>
+</tbody>
+</table>
+<p>Simon Dixon, Onset Detection Revisited, In Proc. of the Int. Conf. on Digital Audio Effects (DAFx-06), pp. 1-6, 2006.</p>
+<table class="docutils citation" frame="void" id="akkermans" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id8">[Akkermans]</a></td><td></td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="22">
+<li>Akkermans, J. Serrà, and P. Herrera, Shape-based Spectral Contrast, proceedings of the SMC 2009 - 6th Sound and Music Computing Conference, no. July, (Porto), pp. 23-25, 2009.</li>
+</ol>
+<table class="docutils citation" frame="void" id="lu" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id9">[Lu]</a></td><td></td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="12">
+<li>Lu, H.-j. Zhang, J.-h. Tao, and L.-h. Cui, Music type classification by spectral contrast feature, Proceedings. IEEE International Conference on Multimedia, pp. 113-116, Ieee, 2002.</li>
+</ol>
+<table class="docutils citation" frame="void" id="gomez" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id10">[Gomez]</a></td><td></td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="5">
+<li>Gomez,Tonal Description of Music Audio Signals. PhD thesis, Universitat Pompeu Fabra, 2006.</li>
+</ol>
+<table class="docutils citation" frame="void" id="ganchev" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id11">[Ganchev]</a></td><td></td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="20">
+<li>Ganchev, N. Fakotakis, and G. Kokkinakis, Comparative Evaluation of Various MFCC Implementations on the Speaker Verification Task, in proceedings of the 10th International Conference on Speech and Computers, vol. 1, (Patras, Greece), pp. 191-194, 2005.</li>
+</ol>
+<table class="docutils citation" frame="void" id="laurier" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[Laurier]</td><td><em>(<a class="fn-backref" href="#id12">1</a>, <a class="fn-backref" href="#id13">2</a>, <a class="fn-backref" href="#id14">3</a>, <a class="fn-backref" href="#id15">4</a>)</em> </td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="3">
+<li>Laurier, O. Meyers, J. Serra, M. Blech, and P. Herrera, Music Mood Annotater Design and Integration, 2009 Seventh International Workshop on Content-Based Multimedia Indexing, pp. 156-161, June 2009.</li>
+</ol>
+<table class="docutils citation" frame="void" id="wack" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[Wack]</td><td><em>(<a class="fn-backref" href="#id16">1</a>, <a class="fn-backref" href="#id17">2</a>)</em> </td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="14">
+<li>Wack, C. Laurier, O. Meyers, R. Marxer, D. Bogdanov, J. Serrà, E. Gómez, and P. Herrera, Music classification using high-level models, tech. rep., Universitat Pompeu Fabra, 2010.</li>
+</ol>
+<table class="docutils citation" frame="void" id="bogdanov" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[Bogdanov]</td><td><em>(<a class="fn-backref" href="#id18">1</a>, <a class="fn-backref" href="#id19">2</a>)</em> </td></tr>
+</tbody>
+</table>
+<ol class="upperalpha simple" start="4">
+<li>Bogdanov, J. Serrà, N. Wack, and P. Herrera, Semantic Similarity Measure For Music Recommendation (A Pharos whitepaper). 2009.</li>
+</ol>
+</div>
+</div>
+<div class="section" id="api-documentation">
+<h1>API documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
+<p>Each module is documented seperately below:</p>
+<div class="section" id="init-py">
+<h2>__init__.py<a class="headerlink" href="#init-py" title="Permalink to this headline">¶</a></h2>
+<p>All information is logged to a central file, whose docstring is shown below:</p>
+<span class="target" id="module-hmosaic.__init__"></span><p>Initialise logging here. The logging settings are read from <tt class="docutils literal"><span class="pre">settings.py</span></tt>
+There are two available modes:
+* FILE_LOGGING
+* SCREEN_LOGGING
+These variables can be set to &#8216;ERROR&#8217;, &#8216;DEBUG&#8217;, &#8216;WARN&#8217;, &#8216;INFO&#8217; or None
+If both variables are set to None then no logging system is initialised</p>
+</div>
+<div class="section" id="settings-py">
+<h2>settings.py<a class="headerlink" href="#settings-py" title="Permalink to this headline">¶</a></h2>
+<p>Global application settings are maintained centrally in the <em>settings</em> module</p>
+<span class="target" id="module-hmosaic.settings"></span><p>This file contains settings for the project.
+e.g. 
+* Ip addresses, ports and allowable address strings for OSC communication.
+* Filepaths to target corpus, test_corpus.
+* shortcuts for analysis keys and paths to Essentia Binaries.</p>
+</div>
+<div class="section" id="control-py">
+<h2>control.py<a class="headerlink" href="#control-py" title="Permalink to this headline">¶</a></h2>
+<p>The main module in the package, it contains a class called OSCControl.
+This process builds mosaics from the source audio, controls segmentation schemes, source corpus selection, etc.</p>
+<p>Full details are displayed in the code documentation below:</p>
+<span class="target" id="module-hmosaic.control"></span><dl class="class">
+<dt id="hmosaic.control.Context">
+<em class="property">class </em><tt class="descclassname">hmosaic.control.</tt><tt class="descname">Context</tt><big>(</big><em>length=20</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Context"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Context" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class keeps track of a certain number of previous units
+It can be used to weight the gaia results based on similarity 
+between each result and the audio in the context.</p>
+<dl class="method">
+<dt id="hmosaic.control.Context.append">
+<tt class="descname">append</tt><big>(</big><em>key</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Context.append"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Context.append" title="Permalink to this definition">¶</a></dt>
+<dd><p>Appends an entry to the dictionary, changes behaviour when full
+This was inspired by the Python Cookbook RingBuffer recipe.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.Context.get_results">
+<tt class="descname">get_results</tt><big>(</big><em>results</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Context.get_results"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Context.get_results" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a GaiaDB of the previous context and searches for each point 
+in the resultset. Returns results updated with the local distance
+factored in.
+The simplest way is to calculate the total distance from each point
+for each result and add that to the result score. That way, those which are very 
+different will be penalised.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.Context.reset">
+<tt class="descname">reset</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Context.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Context.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper method to reset the cost function every time.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.control.Gridder">
+<em class="property">class </em><tt class="descclassname">hmosaic.control.</tt><tt class="descname">Gridder</tt><big>(</big><em>strategy=1</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Gridder"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Gridder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transforms Mosaic Units to match the length of the target unit.</p>
+<dl class="method">
+<dt id="hmosaic.control.Gridder.fit">
+<tt class="descname">fit</tt><big>(</big><em>unit</em>, <em>tlength</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Gridder.fit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Gridder.fit" title="Permalink to this definition">¶</a></dt>
+<dd><p>The fit method takes two params
+* <em>unit</em> - The unit to be modified
+* <em>tlength</em> - The target length
+This method simply applies the current strategy and returns a new unit
+of the correct length.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.Gridder.set_active">
+<tt class="descname">set_active</tt><big>(</big><em>switch</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Gridder.set_active"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Gridder.set_active" title="Permalink to this definition">¶</a></dt>
+<dd><p>Turn this gridder object on or off.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.control.HighLevelControl">
+<em class="property">class </em><tt class="descclassname">hmosaic.control.</tt><tt class="descname">HighLevelControl</tt><big>(</big><em>source_manager</em>, <em>daemon=True</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="hmosaic.control.HighLevelControl.analyseCorpus">
+<tt class="descname">analyseCorpus</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.analyseCorpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.analyseCorpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Analyses the currrent corpus, using <tt class="docutils literal"><span class="pre">self.chop</span></tt> to determine the 
+segmentation scheme to search for.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.listen">
+<tt class="descname">listen</tt><big>(</big><em>pattern</em>, <em>tags</em>, <em>data</em>, <em>client_address</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.listen"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.listen" title="Permalink to this definition">¶</a></dt>
+<dd><p>OSC server method - all valid OSC requests get passed in here
+and are delegated to functions of the class from here.
+Some basic input validation may be done prior to calling functions.
+Exceptions raised will not cause the program to bomb out, 
+so error handling is minimal and logging is maximal.
+I have grouped acceptable message types by component where possible
+e.g. target, analysis, context, etc.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.loadLastTarget">
+<tt class="descname">loadLastTarget</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.loadLastTarget"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.loadLastTarget" title="Permalink to this definition">¶</a></dt>
+<dd><p>This finds the most recently processed target and sets it for use here.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.process_target_hl">
+<tt class="descname">process_target_hl</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.process_target_hl"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.process_target_hl" title="Permalink to this definition">¶</a></dt>
+<dd><p>Processes the target for high level mosaicing.
+The idea is to take a preanalysed, presegmented target
+and process it in a high level manner - 5 second chunks
+Create a gaia unit-db for each chunk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.send_mosaic_path">
+<tt class="descname">send_mosaic_path</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.send_mosaic_path"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.send_mosaic_path" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple method to copy the file at <tt class="docutils literal"><span class="pre">self.mosaic.filepath</span></tt> 
+to some predefined location where PureData or any other audio
+engine can find it. An OSC message is then sent to the engine
+to notify it that the file is ready.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.setConstraints">
+<tt class="descname">setConstraints</tt><big>(</big><em>constraints_array</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.setConstraints"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.setConstraints" title="Permalink to this definition">¶</a></dt>
+<dd><p>This sets <strong>self.constraints</strong>. These are the descriptors 
+and weights used during the low level unit search process.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.setHLConstraints">
+<tt class="descname">setHLConstraints</tt><big>(</big><em>constraints_array</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.setHLConstraints"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.setHLConstraints" title="Permalink to this definition">¶</a></dt>
+<dd><p>This sets <strong>self.chl_onstraints</strong>. These are the descriptors 
+and weights used during the high level unit search process.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.setOnsets">
+<tt class="descname">setOnsets</tt><big>(</big><em>onsets_array</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.setOnsets"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.setOnsets" title="Permalink to this definition">¶</a></dt>
+<dd><p>Used to set the onsets weights parameter.
+Converts pairs in a sequence to a dict representation.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.HighLevelControl.useLabelThreshold">
+<tt class="descname">useLabelThreshold</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#HighLevelControl.useLabelThreshold"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.HighLevelControl.useLabelThreshold" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets a label and threshold to be used during high level mosaicing.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.control.RepeatUnitCost">
+<em class="property">class </em><tt class="descclassname">hmosaic.control.</tt><tt class="descname">RepeatUnitCost</tt><big>(</big><em>factor=0.02</em>, <em>context=20</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#RepeatUnitCost"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.RepeatUnitCost" title="Permalink to this definition">¶</a></dt>
+<dd><p>This should accept a gaia result set as input and
+return a single unit as output.
+Cost is based on gaia similarity score, if the result has
+already been selected and (maybe) the similarity of the result
+to the context.
+This Cost object ought to be configurable...</p>
+<dl class="method">
+<dt id="hmosaic.control.RepeatUnitCost.check_repeats">
+<tt class="descname">check_repeats</tt><big>(</big><em>unit</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#RepeatUnitCost.check_repeats"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.RepeatUnitCost.check_repeats" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.RepeatUnitCost.get_results">
+<tt class="descname">get_results</tt><big>(</big><em>results</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#RepeatUnitCost.get_results"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.RepeatUnitCost.get_results" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.control.RepeatUnitCost.reset">
+<tt class="descname">reset</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#RepeatUnitCost.reset"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.RepeatUnitCost.reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>helper method to reset the cost function</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.control.Target">
+<em class="property">class </em><tt class="descclassname">hmosaic.control.</tt><tt class="descname">Target</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Target"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Target" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simple model of a target with a filepath and 
+some useful analysis data like length and bpm</p>
+<dl class="method">
+<dt id="hmosaic.control.Target.set_props">
+<tt class="descname">set_props</tt><big>(</big><em>analysis</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#Target.set_props"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.Target.set_props" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads the analysis of the complete target file into a gaia point 
+and extracts certain high level features/classifiers. The features
+are then stored in a dictionary for later retrieval.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.equalise_datasets">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">equalise_datasets</tt><big>(</big><em>tds</em>, <em>sds</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#equalise_datasets"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.equalise_datasets" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes two Gaia datasets and makes sure they have the same layout.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.extract_from_list">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">extract_from_list</tt><big>(</big><em>func</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#extract_from_list"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.extract_from_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>This decorator is intended to manipulate  a list argument to functions,
+returning the function without the argument when the list is empty and
+with the value stripped from its list when the list has one value. 
+Designed to allow seamlessness between calling methods in 
+daemon mode (using OSCMessages) or calling them in programmatic mode.
+i.e. So you don&#8217;t have to put arguments in a list when calling methods
+programatically</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.gaia_transform">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">gaia_transform</tt><big>(</big><em>points</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#gaia_transform"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.gaia_transform" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes a dict of point names and filepaths
+Creates a DataSet and performs the standard transformations</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.get_low_level_distance">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">get_low_level_distance</tt><big>(</big><em>unit_db</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#get_low_level_distance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.get_low_level_distance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a hard coded low level distance based on length, pitch and 
+spectral energy</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.get_mood_distance">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">get_mood_distance</tt><big>(</big><em>unit_db</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#get_mood_distance"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.get_mood_distance" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a hard coded mood distance. A linear combination of
+euclidean distances for all 4 moods.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.get_unused_descriptors">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">get_unused_descriptors</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#get_unused_descriptors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.get_unused_descriptors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a set of descriptors which are not used and which occasionaly 
+cause problems with gaia due to their values.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.strip_arguments">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">strip_arguments</tt><big>(</big><em>func</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#strip_arguments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.strip_arguments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorator to strip the arguments and keyword arguments from 
+a function call,</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.control.validate_setting">
+<tt class="descclassname">hmosaic.control.</tt><tt class="descname">validate_setting</tt><big>(</big><em>setting</em><big>)</big><a class="reference internal" href="_modules/hmosaic/control.html#validate_setting"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.control.validate_setting" title="Permalink to this definition">¶</a></dt>
+<dd><p>Makes sure that the given <strong>setting</strong> exists in <cite>settings.py</cite>.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="corpus-py">
+<h2>corpus.py<a class="headerlink" href="#corpus-py" title="Permalink to this headline">¶</a></h2>
+<p>This module contains classes for managing audio files and analysis.
+An extensible base class is provided so that the software may be extended with
+different file management schemes and methodologies.
+The provided <em>FileCorpus</em> implementation also provides methods for segmenting source audio
+and for returning Gaia DataSets populated by analysis of parts of the source corpus.</p>
+<p>Full documentation  follows below:</p>
+<span class="target" id="module-hmosaic.corpus"></span><p>Contains all code related to database and file management aspects
+Gaia similarity search is also encapsulated in here. .
+Base classes are defined and a file based database management system is
+implemented.</p>
+<dl class="class">
+<dt id="hmosaic.corpus.Corpus">
+<em class="property">class </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">Corpus</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a corpus, it can yield units based on supplied constraints.
+This base class has been kept very abstract so as to allow
+maximum flexibility. All of the below methods ought to be implemented
+in a subclass, so as to allow modularity and interchangeable components.</p>
+<dl class="method">
+<dt id="hmosaic.corpus.Corpus.list_audio_files">
+<tt class="descname">list_audio_files</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus.list_audio_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus.list_audio_files" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns filepaths for all audio files. The criteria for which units to 
+select would be implemented by overriding this function.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.Corpus.list_audio_units">
+<tt class="descname">list_audio_units</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus.list_audio_units"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus.list_audio_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns filepaths for all units. The criteria for which units to 
+select would be implemented by overriding this function.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.Corpus.save_marked_audio">
+<tt class="descname">save_marked_audio</tt><big>(</big><em>name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus.save_marked_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus.save_marked_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the audio file requested.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.Corpus.segment_audio">
+<tt class="descname">segment_audio</tt><big>(</big><em>name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus.segment_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus.segment_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Segments the audio into units. This function may instantiate
+an object from  <tt class="docutils literal"><span class="pre">hmosaic.segment</span></tt> to take care of 
+the segmentation details.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.Corpus.store_audio">
+<tt class="descname">store_audio</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#Corpus.store_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.Corpus.store_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Provides a means to add audio to the corpus ...</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="hmosaic.corpus.CorpusDoesNotExistException">
+<em class="property">exception </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">CorpusDoesNotExistException</tt><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusDoesNotExistException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusDoesNotExistException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thrown when loading or deleting a corpus which does not exist.</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="hmosaic.corpus.CorpusExistsException">
+<em class="property">exception </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">CorpusExistsException</tt><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusExistsException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusExistsException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thrown when attempting to create a corpus which already exists.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.corpus.CorpusManager">
+<em class="property">class </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">CorpusManager</tt><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>Abstract base class for a CorpusManager.
+A corpus manager knows about all existing corpuses.
+It can create and delete corpuses, list all the available
+corpuses and return a corpus instance.
+This base class has been kept very abstract so as to allow
+maximum flexibility. All of the below methods ought to be implemented
+in a subclass, so as to allow modularity and interchangeable components.</p>
+<dl class="method">
+<dt id="hmosaic.corpus.CorpusManager.create_corpus">
+<tt class="descname">create_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusManager.create_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusManager.create_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a corpus.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.CorpusManager.delete_corpus">
+<tt class="descname">delete_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusManager.delete_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusManager.delete_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deletes the corpus indicated by corpus_name!!!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.CorpusManager.list_corpuses">
+<tt class="descname">list_corpuses</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusManager.list_corpuses"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusManager.list_corpuses" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of available corpuses.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.CorpusManager.load_corpus">
+<tt class="descname">load_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#CorpusManager.load_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.CorpusManager.load_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an instance of the corpus indicated by corpus_name.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.corpus.FileCorpus">
+<em class="property">class </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">FileCorpus</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a corpus, it can yield units based on supplied constraints.
+All analysis is stored as a yaml file and is produced by Essentia.
+Whole files can be analysed using high level analysis, while units
+are analysed using a stripped down version of the analysis as it is 
+much faster.
+Gaia is used to build DataSets of the analysed units. Each 
+segmentation of the source audio file (e.g. based on detected onsets or
+using a fix length chop size for segmentation like 500 ms,1000 ms,etc.)
+It is recommended to keep these Datasets relatively small 
+e.g. 15000 units.
+Performance issues have been encountered using larger DataSets 
+(&gt; 30000 units)
+A file corpus looks like this</p>
+<blockquote>
+<dl class="docutils">
+<dt>corpus_name</dt>
+<dd><p class="first">&#8212;&gt; unit_ds_onsets.db
+&#8212;&gt; unit_ds_500.db
+&#8212;&gt; unit_ds_1000.db
+&#8212;&gt; audio1.wav
+&#8212;&gt; audio1.yaml
+&#8212;&gt; audio1</p>
+<blockquote class="last">
+<dl class="docutils">
+<dt>&#8212;&gt; 500</dt>
+<dd>&#8212;&gt; 1.wav
+&#8212;&gt; 2.wav
+&#8212;&gt; 3.wav</dd>
+<dt>&#8212;&gt; 1000</dt>
+<dd>&#8212;&gt; 1.wav</dd>
+<dt>&#8212;&gt; onsets</dt>
+<dd>&#8212;&gt; 1_0.wav
+&#8212;&gt; 1_0.yaml
+&#8212;&gt; 2_1.wav
+&#8212;&gt; 2_1.yaml
+&#8212;&gt; 3_1.wav
+&#8212;&gt; 3_1.yaml
+&#8212;&gt; 4_2.wav
+&#8212;&gt; 4_2.yaml</dd>
+</dl>
+</blockquote>
+</dd>
+</dl>
+</blockquote>
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.create_gaia_db">
+<tt class="descname">create_gaia_db</tt><big>(</big><em>chop='onsets'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.create_gaia_db"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.create_gaia_db" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates Gaia datasets for all units of the given <tt class="docutils literal"><span class="pre">chop</span></tt> segmentation
+scheme from all the .yaml files produced by the essentia analysis.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.delete_audio">
+<tt class="descname">delete_audio</tt><big>(</big><em>filename</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.delete_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.delete_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deletes the given audio at <tt class="docutils literal"><span class="pre">filename</span></tt> and all it&#8217;s associated 
+units. <tt class="docutils literal"><span class="pre">filename</span></tt> can be the basename of the audio in the corpus
+or the full filepath to the audio in the corpus.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.get_filepath">
+<tt class="descname">get_filepath</tt><big>(</big><em>filename</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.get_filepath"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.get_filepath" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given the name of a file, <tt class="docutils literal"><span class="pre">filename</span></tt> which was added to the 
+corpus, this function returns the full filepath of the file inside
+the corpus or <strong>None</strong> if <tt class="docutils literal"><span class="pre">filename</span></tt> cannot be found.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.get_gaia_unit_db">
+<tt class="descname">get_gaia_unit_db</tt><big>(</big><em>chop='onsets'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.get_gaia_unit_db"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.get_gaia_unit_db" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a gaia db instance for similarity searching.
+Gaia databases are composed of all units from a given chop size,
+although in the case of onsets based segmentation unit size is 
+variable.
+The <tt class="docutils literal"><span class="pre">chop</span></tt> argument is therefore required as it will be present
+in the filename of the Gaia DataSet on disk.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.get_most_recent">
+<tt class="descname">get_most_recent</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.get_most_recent"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.get_most_recent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the most recently created segment and returns
+the corresponding audio file. This can be used to set
+the most recently target - useful for testing!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.list_audio_files">
+<tt class="descname">list_audio_files</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.list_audio_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.list_audio_files" title="Permalink to this definition">¶</a></dt>
+<dd><p>Lists those audio files all audio files in the corpus.
+1 big assumption: Audio files are <a href="#id22"><span class="problematic" id="id23">*</span></a>.wav always!!</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.list_audio_units">
+<tt class="descname">list_audio_units</tt><big>(</big><em>audio_filename=None</em>, <em>chop=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.list_audio_units"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.list_audio_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return full filepaths for all units</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.save_marked_audio">
+<tt class="descname">save_marked_audio</tt><big>(</big><em>filename</em>, <em>onset_weights={}</em>, <em>aubio=None</em>, <em>chop=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.save_marked_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.save_marked_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Looks for a name - which should be in the db and
+marks the current onsets and saves the file to the corpus.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.search_audio_files">
+<tt class="descname">search_audio_files</tt><big>(</big><em>pattern</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.search_audio_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.search_audio_files" title="Permalink to this definition">¶</a></dt>
+<dd><p>Accepts a regular expression and returns those filenames
+which match.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.segment_audio">
+<tt class="descname">segment_audio</tt><big>(</big><em>audio_filepath</em>, <em>chop=500</em>, <em>hop=None</em>, <em>onset_weights={}</em>, <em>aubio=False</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.segment_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.segment_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes an audio file and segments it according to the chop value
+(milliseconds).
+A subfolder is created, same name as the audio file, inside this
+folder, we have another folder with the chop time and the units 
+are held in there.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.store_audio">
+<tt class="descname">store_audio</tt><big>(</big><em>audio_filepath</em>, <em>filename=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.store_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.store_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds audio to the corpus. If <tt class="docutils literal"><span class="pre">filename</span></tt> is supplied, then the
+source audio is added to the corpus using that filename. Otherwise
+the basename of <tt class="docutils literal"><span class="pre">audio_filepath</span></tt> is used.
+Source files must be unique in the corpus, so an exception is raised
+if this name already exists. The file is then converted to 
+monophonic, 44.1 kHz wav format before being stored in the corpus.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpus.store_info">
+<tt class="descname">store_info</tt><big>(</big><em>info_dict</em>, <em>filename</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.store_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.store_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stores information in the <cite>info_dict</cite> to disk at location 
+indicated by filename.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.corpus.FileCorpusManager">
+<em class="property">class </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">FileCorpusManager</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpusManager"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpusManager" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="hmosaic.corpus.FileCorpusManager.create_corpus">
+<tt class="descname">create_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpusManager.create_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpusManager.create_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an empty corpus by creating a directory 
+in the repository.
+Raises an exception if the corpus of that name already exists.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpusManager.delete_corpus">
+<tt class="descname">delete_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpusManager.delete_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpusManager.delete_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Will delete the corpus!!! Returns True upon successful deletion,
+False otherwise</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpusManager.list_corpuses">
+<tt class="descname">list_corpuses</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpusManager.list_corpuses"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpusManager.list_corpuses" title="Permalink to this definition">¶</a></dt>
+<dd><p>All the subdirectories in self.repository are assumed
+to be file corpuses.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.corpus.FileCorpusManager.load_corpus">
+<tt class="descname">load_corpus</tt><big>(</big><em>corpus_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpusManager.load_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpusManager.load_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raises an exception if the corpus indicated by corpus_name
+doesn&#8217;t exist. Returns an instance of a FileCorpus otherwise.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="hmosaic.corpus.FileExistsException">
+<em class="property">exception </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">FileExistsException</tt><a class="reference internal" href="_modules/hmosaic/corpus.html#FileExistsException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileExistsException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thrown when the file already exists in the corpus.</p>
+</dd></dl>
+
+<dl class="exception">
+<dt id="hmosaic.corpus.FileNotFoundException">
+<em class="property">exception </em><tt class="descclassname">hmosaic.corpus.</tt><tt class="descname">FileNotFoundException</tt><a class="reference internal" href="_modules/hmosaic/corpus.html#FileNotFoundException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileNotFoundException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Thrown when a file cannot be found.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="analyse-py">
+<h2>analyse.py<a class="headerlink" href="#analyse-py" title="Permalink to this headline">¶</a></h2>
+<p>Provides an analyser for interfacing with different precompiled essentia,
+streaming extractor binaries.</p>
+<span class="target" id="module-hmosaic.analyse"></span><p>Different music content analysers are stored here.
+The system was built on top of Essentia, however in order to
+use some other analyser you just need to provide</p>
+<dl class="class">
+<dt id="hmosaic.analyse.EssentiaAnalyser">
+<em class="property">class </em><tt class="descclassname">hmosaic.analyse.</tt><tt class="descname">EssentiaAnalyser</tt><a class="reference internal" href="_modules/hmosaic/analyse.html#EssentiaAnalyser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.EssentiaAnalyser" title="Permalink to this definition">¶</a></dt>
+<dd><p>Is used for invoking the binary essentia analyser.
+It may be run in batch mode or for a single file.
+The extracted analysis is always written to a .yaml
+file with the same filepath as the original .wav file
+which was presented for analysis.</p>
+<dl class="method">
+<dt id="hmosaic.analyse.EssentiaAnalyser.analyse">
+<tt class="descname">analyse</tt><big>(</big><em>audio_files</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#EssentiaAnalyser.analyse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.EssentiaAnalyser.analyse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parameter is a list of audio files.
+A generator is returned with the analysis data for each file.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.analyse.EssentiaAnalyser.analyse_audio">
+<tt class="descname">analyse_audio</tt><big>(</big><em>audio_filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#EssentiaAnalyser.analyse_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.EssentiaAnalyser.analyse_audio" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function invokes the essentia binary.
+Reads in the output file, deletes the file 
+and returns a dictionary.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.analyse.EssentiaAnalyser.set_bin">
+<tt class="descname">set_bin</tt><big>(</big><em>bin_name</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#EssentiaAnalyser.set_bin"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.EssentiaAnalyser.set_bin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Allows dynamic switching of binary analysers, e.g. for analysing 
+solely low level features one can enjoy a much faster analysis 
+process by switching the analyser binary. The only constraint is 
+that the new binary must be stored in the same directory as the 
+default setting (read from settings.py)</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
+<dt id="hmosaic.analyse.EssentiaError">
+<em class="property">exception </em><tt class="descclassname">hmosaic.analyse.</tt><tt class="descname">EssentiaError</tt><a class="reference internal" href="_modules/hmosaic/analyse.html#EssentiaError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.EssentiaError" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.analyse.LoudnessAnalyser">
+<em class="property">class </em><tt class="descclassname">hmosaic.analyse.</tt><tt class="descname">LoudnessAnalyser</tt><big>(</big><em>hop_size=512</em>, <em>window_size=1024</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#LoudnessAnalyser"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.LoudnessAnalyser" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="hmosaic.analyse.LoudnessAnalyser.fft">
+<tt class="descname">fft</tt><big>(</big><em>audio_frame</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#LoudnessAnalyser.fft"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.LoudnessAnalyser.fft" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates frames of raw fft&#8217;ed audio.
+Window size is set to self.frame_size so it might be an idea to
+set this to 701 or something before calling this function.
+The middle sample in the window stays at 0 - is this correct?</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.analyse.LoudnessAnalyser.get_frames">
+<tt class="descname">get_frames</tt><big>(</big><em>audio_data</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#LoudnessAnalyser.get_frames"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.LoudnessAnalyser.get_frames" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generator function to return frames of the audio. 
+Only yield complete frames. No zero padding. We ditch
+leftover samples that can&#8217;t fill a frame.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.analyse.LoudnessAnalyser.get_loudness">
+<tt class="descname">get_loudness</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/analyse.html#LoudnessAnalyser.get_loudness"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.analyse.LoudnessAnalyser.get_loudness" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="segment-py">
+<h2>segment.py<a class="headerlink" href="#segment-py" title="Permalink to this headline">¶</a></h2>
+<p>Provides classes for segmenting the audio in different schemes.
+One uses a fixed unit size, the other uses onsets derived from analysis using
+Essentia or Aubio.</p>
+<span class="target" id="module-hmosaic.segment"></span><p>Contains all models related to segmentation. 
+Aubio and Essentia are both utilised by different routines.</p>
+<dl class="class">
+<dt id="hmosaic.segment.AudioSegmenter">
+<em class="property">class </em><tt class="descclassname">hmosaic.segment.</tt><tt class="descname">AudioSegmenter</tt><big>(</big><em>chop=500</em>, <em>hop=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#AudioSegmenter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.AudioSegmenter" title="Permalink to this definition">¶</a></dt>
+<dd><p>Basic fixed length segmenter. Is initialised with a given 
+<tt class="docutils literal"><span class="pre">chop</span></tt> size (in ms) and provides methods to retrieve an array
+of marked audio data and a generator function to yield units
+of segmented audio, which can be written to the corpus.
+This class may be considered the base class for a segmenter.
+Any subclasses ought to override these 3 object functions</p>
+<dl class="method">
+<dt id="hmosaic.segment.AudioSegmenter.mark_audio">
+<tt class="descname">mark_audio</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#AudioSegmenter.mark_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.AudioSegmenter.mark_audio" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.segment.AudioSegmenter.segment">
+<tt class="descname">segment</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#AudioSegmenter.segment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.AudioSegmenter.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tries to create an Audio instance here.
+Yields segments of sample data.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.segment.NoteOnsetSegmenter">
+<em class="property">class </em><tt class="descclassname">hmosaic.segment.</tt><tt class="descname">NoteOnsetSegmenter</tt><big>(</big><em>sr=44100</em>, <em>frame_size=4096</em>, <em>hop_size=512</em>, <em>onset_weights={'rms': 1</em>, <em>'hfc': 1</em>, <em>'complex': 1</em>, <em>'flux': 0.0}</em>, <em>filter_audio=False</em>, <em>aubio=False</em>, <em>fixedlength=False</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#NoteOnsetSegmenter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.NoteOnsetSegmenter" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a pure essentia segmenter.
+I have found that hfc and rms give better result so 
+that&#8217;s why the defaults are as they are. Weights are 
+evaluated as 1. complex, 2. hfc, 3. rms</p>
+<dl class="method">
+<dt id="hmosaic.segment.NoteOnsetSegmenter.mark_audio">
+<tt class="descname">mark_audio</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#NoteOnsetSegmenter.mark_audio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.NoteOnsetSegmenter.mark_audio" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.segment.NoteOnsetSegmenter.segment">
+<tt class="descname">segment</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#NoteOnsetSegmenter.segment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.NoteOnsetSegmenter.segment" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.segment.NoteOnsetSegmenter.set_weights">
+<tt class="descname">set_weights</tt><big>(</big><em>weights</em><big>)</big><a class="reference internal" href="_modules/hmosaic/segment.html#NoteOnsetSegmenter.set_weights"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.segment.NoteOnsetSegmenter.set_weights" title="Permalink to this definition">¶</a></dt>
+<dd><p>Expects weights to be a valid onset_weights dictionary</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="models-py">
+<h2>models.py<a class="headerlink" href="#models-py" title="Permalink to this headline">¶</a></h2>
+<p>Provides high level representations of Mosaics, MosaicUnits, Audio, etc.</p>
+<span class="target" id="module-hmosaic.models"></span><p>This module contains most of the models used in the framework.
+This includes <strong>storm</strong> ORM models, as well as quite sophisticated
+Mosaic models which keep track of their constituent units and can apply 
+global crossfades and timestretching.</p>
+<dl class="class">
+<dt id="hmosaic.models.DBSegment">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">DBSegment</tt><a class="reference internal" href="_modules/hmosaic/models.html#DBSegment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.DBSegment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Information about segments drawn from the <em>DBSongs</em>
+Contains high level analysis data like <em>male</em>, <em>female</em>
+<em>vocal</em>, <em>instrumental</em>, etc.</p>
+<dl class="attribute">
+<dt id="hmosaic.models.DBSegment.song">
+<tt class="descname">song</tt><a class="headerlink" href="#hmosaic.models.DBSegment.song" title="Permalink to this definition">¶</a></dt>
+<dd><p>Descriptor for one-to-one relationships.</p>
+<p>This is typically used when the class that it is being defined on
+has a foreign key onto another table:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">OtherGuy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">MyGuy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="n">other_guy_id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">()</span>
+    <span class="n">other_guy</span> <span class="o">=</span> <span class="n">Reference</span><span class="p">(</span><span class="n">other_guy_id</span><span class="p">,</span> <span class="n">OtherGuy</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>but can also be used for backwards references, where OtherGuy&#8217;s
+table has a foreign key onto the class that you want this property
+on:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="k">class</span> <span class="nc">OtherGuy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="n">my_guy_id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">()</span> <span class="c"># in the database, a foreign key to my_guy.id</span>
+
+<span class="k">class</span> <span class="nc">MyGuy</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="o">...</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">()</span>
+    <span class="n">other_guy</span> <span class="o">=</span> <span class="n">Reference</span><span class="p">(</span><span class="nb">id</span><span class="p">,</span> <span class="n">OtherGuy</span><span class="o">.</span><span class="n">my_guy_id</span><span class="p">,</span> <span class="n">on_remote</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In both cases, C{MyGuy().other_guy} will resolve to the
+C{OtherGuy} instance which is linked to it. In the first case, it
+will be the C{OtherGuy} instance whose C{id} is equivalent to the
+C{MyGuy}&#8217;s C{other_guy_id}; in the second, it&#8217;ll be the
+C{OtherGuy} instance whose C{my_guy_id} is equivalent to the
+C{MyGuy}&#8217;s C{id}.</p>
+<p>Assigning to the property, for example with C{MyGuy().other_guy =
+OtherGuy()}, will link the objects and update either
+C{MyGuy.other_guy_id} or C{OtherGuy.my_guy_id} accordingly.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.DBSong">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">DBSong</tt><a class="reference internal" href="_modules/hmosaic/models.html#DBSong"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.DBSong" title="Permalink to this definition">¶</a></dt>
+<dd><p>Information about the full source audio files</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.DataUnit">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">DataUnit</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#DataUnit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.DataUnit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Simplest represenation - just an array of mono signal.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.Mosaic">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">Mosaic</tt><big>(</big><em>filepath=None</em>, <em>units=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Mosaic object containing methods to concatenate units,
+crossfade units, persist to disk, play the units, etc.</p>
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.add_audio_samples">
+<tt class="descname">add_audio_samples</tt><big>(</big><em>data</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.add_audio_samples"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.add_audio_samples" title="Permalink to this definition">¶</a></dt>
+<dd><p>Public accessor method for the private <tt class="docutils literal"><span class="pre">self._append_data</span></tt>
+function.
+Allows arrays of sample data to be added directly to the mosaic.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.add_unit">
+<tt class="descname">add_unit</tt><big>(</big><em>unit</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.add_unit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.add_unit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a <tt class="docutils literal"><span class="pre">unit</span></tt> of type <tt class="docutils literal"><span class="pre">Unit</span></tt> to the Mosaic.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.create_submosaic">
+<tt class="descname">create_submosaic</tt><big>(</big><em>no_units</em>, <em>start_unit=0</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.create_submosaic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.create_submosaic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a submosaic starting from the given <tt class="docutils literal"><span class="pre">start_unit</span></tt>,
+with a length of <tt class="docutils literal"><span class="pre">no_units</span></tt>.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.crossfade">
+<tt class="descname">crossfade</tt><big>(</big><em>overlap=50</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.crossfade"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.crossfade" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply fade in and FADE OUT AND overlap the results.</p>
+<p>New approach applies a fade to the first and last &#8216;overlap&#8217; ms.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.export">
+<tt class="descname">export</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.export"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.export" title="Permalink to this definition">¶</a></dt>
+<dd><p>Exports the mosaic to the given <tt class="docutils literal"><span class="pre">filepath</span></tt></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.get_submosaic">
+<tt class="descname">get_submosaic</tt><big>(</big><em>no_units=None</em>, <em>start_unit=0</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.get_submosaic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.get_submosaic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience method to get a submosaic.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.merge_mosaics">
+<tt class="descname">merge_mosaics</tt><big>(</big><em>mosaic</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.merge_mosaics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.merge_mosaics" title="Permalink to this definition">¶</a></dt>
+<dd><p>Accepts a <tt class="docutils literal"><span class="pre">mosaic</span></tt> of type <tt class="docutils literal"><span class="pre">Mosaic</span></tt> as a parameter and merges
+the units from this mosaic into the current one.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.normalise">
+<tt class="descname">normalise</tt><big>(</big><em>factor=0.98999999999999999</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.normalise"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.normalise" title="Permalink to this definition">¶</a></dt>
+<dd><p>Normalise the data array and scale by <tt class="docutils literal"><span class="pre">factor</span></tt>
+This operation acts on the <tt class="docutils literal"><span class="pre">data</span></tt> attribute of the mosaic, so
+it should be performed after crossfading and timestretching.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.persist">
+<tt class="descname">persist</tt><big>(</big><em>filepath=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.persist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.persist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves the mosaic to that location on disk indicated by
+the <cite>filepath</cite> parameter.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.play">
+<tt class="descname">play</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.play"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.play" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience wrapper for the <tt class="docutils literal"><span class="pre">play</span></tt> function, imported as 
+<tt class="docutils literal"><span class="pre">play_array</span></tt> from <tt class="docutils literal"><span class="pre">scikits.audiolab</span></tt></p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.play_units">
+<tt class="descname">play_units</tt><big>(</big><em>no_units=None</em>, <em>start_unit=0</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.play_units"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.play_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convenience method to create and play a submosaic in one function
+call.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.Mosaic.timestretch">
+<tt class="descname">timestretch</tt><big>(</big><em>length=None</em>, <em>crossfade=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Mosaic.timestretch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Mosaic.timestretch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Timestretch each unit to match the given length (in ms).
+If <tt class="docutils literal"><span class="pre">crossfade</span></tt> is not <strong>None</strong> then take the crossfade
+into account for the stretch. This function uses the <strong>Rubberband</strong>
+timestretching library. If the stretch is extreme then the sound may
+be extremely degraded.
+For each unit - we write it to an audiofile, perform the timestretch and
+read back in the audio file and then we crossfade.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.MosaicUnit">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">MosaicUnit</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#MosaicUnit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.MosaicUnit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Another bare bones audio class - practially identical to SegmentAudio,
+except that it can be marked as silent, and it can also recalculate 
+its own properties.</p>
+<dl class="method">
+<dt id="hmosaic.models.MosaicUnit.recalculate">
+<tt class="descname">recalculate</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#MosaicUnit.recalculate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.MosaicUnit.recalculate" title="Permalink to this definition">¶</a></dt>
+<dd><p>If unit is set to silent then this method should be called.
+It recalculates length and no of samples.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="hmosaic.models.MosaicUnit.set_filepath">
+<tt class="descname">set_filepath</tt><big>(</big><em>path</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#MosaicUnit.set_filepath"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.MosaicUnit.set_filepath" title="Permalink to this definition">¶</a></dt>
+<dd><p>When passed a valid wav file into <tt class="docutils literal"><span class="pre">path</span></tt>, this file
+is read and the current data is replaced by this new data.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.SegmentAudio">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">SegmentAudio</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#SegmentAudio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.SegmentAudio" title="Permalink to this definition">¶</a></dt>
+<dd><p>Very simple audio class - encapsulates the following information
+about an audio file:
+* <tt class="docutils literal"><span class="pre">filepath</span></tt> - location of original file.
+* <tt class="docutils literal"><span class="pre">audio_array</span></tt> - 32bit floating point array of audio signal.
+* <tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.
+* <tt class="docutils literal"><span class="pre">format</span></tt> - format of the wav file.
+* <tt class="docutils literal"><span class="pre">name</span></tt> - basename from the filepath
+* <tt class="docutils literal"><span class="pre">samples</span></tt> - number of samples in the array
+* <tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</p>
+<p>Designed to be used with a segmenter but it is generic enough
+to be used elsewhere (or as a base class)</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="hmosaic.models.Unit">
+<em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">Unit</tt><big>(</big><em>data</em>, <em>sample_rate</em>, <em>length</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#Unit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.Unit" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class is also designed to be used with segmenters, it is intended
+to be the <tt class="docutils literal"><span class="pre">unit</span></tt> which is yielded in the <tt class="docutils literal"><span class="pre">segment</span></tt> routine.
+Unlike the SegmentAudio class, this Unit class does not read an audio
+file. All parameters are passed to it in the initialiser.</p>
+<p>It stores only the following attributes:
+* <tt class="docutils literal"><span class="pre">data</span></tt> - 32bit floating point array of audio signal.
+* <tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.
+* <tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="utils-py">
+<h2>utils.py<a class="headerlink" href="#utils-py" title="Permalink to this headline">¶</a></h2>
+<p>Any code which gets used more than once is refactored into a function and
+stored in here. We have mainly audio/signal processing, string processing and
+filesystem oriented functions.</p>
+<span class="target" id="module-hmosaic.utils"></span><p>Contains functions which are repeatedly used by different parts of 
+the framework.</p>
+<dl class="function">
+<dt id="hmosaic.utils.get_db_connection">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">get_db_connection</tt><big>(</big><em>dbname</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#get_db_connection"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.get_db_connection" title="Permalink to this definition">¶</a></dt>
+<dd><p>Opens a connection to the database. The db is assumed to be in 
+the same directory. Returns a <tt class="docutils literal"><span class="pre">Store</span></tt> interface to the db.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.get_files_recursive">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">get_files_recursive</tt><big>(</big><em>directory</em>, <em>ext='.wav'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#get_files_recursive"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.get_files_recursive" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generator to finds all files with extension &#8216;ext&#8217;</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.get_gaia_point">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">get_gaia_point</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#get_gaia_point"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.get_gaia_point" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tries to load an essentia yaml analysis file (specified in <cite>filepath</cite>)
+as a gaia point.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.load_yaml">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">load_yaml</tt><big>(</big><em>self</em>, <em>analysis_filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#load_yaml"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.load_yaml" title="Permalink to this definition">¶</a></dt>
+<dd><p>Uses yaml to return a dictionary of analysis values 
+given an <tt class="docutils literal"><span class="pre">analysis_filepath</span></tt></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.most_recent_first">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">most_recent_first</tt><big>(</big><em>paths</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#most_recent_first"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.most_recent_first" title="Permalink to this definition">¶</a></dt>
+<dd><p>Orders a list of filepaths by most recently modified first.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.prepare_thresholds">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">prepare_thresholds</tt><big>(</big><em>func</em>, <em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#prepare_thresholds"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.prepare_thresholds" title="Permalink to this definition">¶</a></dt>
+<dd><p>A decorator to clean the thresholds string and pass it
+to the function.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.timestretch">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">timestretch</tt><big>(</big><em>unit</em>, <em>length</em>, <em>sr</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#timestretch"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.timestretch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stretches a <cite>hmosaic.models.MosaicUnit</cite> to the given <strong>length</strong> 
+for the specified sample rate, <strong>sr</strong>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.to_mono">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">to_mono</tt><big>(</big><em>audio_data</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#to_mono"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.to_mono" title="Permalink to this definition">¶</a></dt>
+<dd><p>Accepts an array of audio data and converts it to mono, ensuring that
+it is represented as an array of 32bit floating point numbers.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.utils.wav_timestamp">
+<tt class="descclassname">hmosaic.utils.</tt><tt class="descname">wav_timestamp</tt><big>(</big><em>filename</em><big>)</big><a class="reference internal" href="_modules/hmosaic/utils.html#wav_timestamp"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.utils.wav_timestamp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a filename or path renamed to contain a timestamp, unique
+to the minute...</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="scripts-documentation">
+<h1>Scripts documentation<a class="headerlink" href="#scripts-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="createcorpus-py">
+<h2>createCorpus.py<a class="headerlink" href="#createcorpus-py" title="Permalink to this headline">¶</a></h2>
+<p>This script accepts a filepath or directory name as parameter and creates a source corpus from
+all the audio it finds there.</p>
+<span class="target" id="module-hmosaic.scripts.createCorpus"></span><dl class="function">
+<dt id="hmosaic.scripts.createCorpus.create_corpus">
+<tt class="descclassname">hmosaic.scripts.createCorpus.</tt><tt class="descname">create_corpus</tt><big>(</big><em>filepath</em>, <em>weights</em>, <em>chop</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createCorpus.html#create_corpus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createCorpus.create_corpus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a directory callled corpus in the same directory as filepath,
+convert all the audio files, segment and analyse...
+ffmpeg must be installed for Mp3 conversion to work</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createCorpus.parseCommandLineOptions">
+<tt class="descclassname">hmosaic.scripts.createCorpus.</tt><tt class="descname">parseCommandLineOptions</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createCorpus.html#parseCommandLineOptions"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createCorpus.parseCommandLineOptions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set up the option parser and return onset_detection_type.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="createhighlevelchops-py">
+<h2>createHighLevelChops.py<a class="headerlink" href="#createhighlevelchops-py" title="Permalink to this headline">¶</a></h2>
+<p>This module contains functions for testing hierarchical mosaicing processes.</p>
+<span class="target" id="module-hmosaic.scripts.createHighLevelChops"></span><dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.gaia_transform">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">gaia_transform</tt><big>(</big><em>points</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#gaia_transform"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.gaia_transform" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes a dict of point names and filepaths.
+Creates a DataSet and performs the standard transformations</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.get_unused_descriptors">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">get_unused_descriptors</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#get_unused_descriptors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.get_unused_descriptors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets some descriptors which are not commonly used in order to remove
+them from the analysis</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.highlevel_mosaic">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">highlevel_mosaic</tt><big>(</big><em>target</em>, <em>tcorpus</em>, <em>scorpus</em>, <em>scope=5</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#highlevel_mosaic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.highlevel_mosaic" title="Permalink to this definition">¶</a></dt>
+<dd><p>This will be used to test the highlevel mosaicing process.
+The scope variable controls the number of results which are returned 
+for each target unit which is sought.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.initial_test">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">initial_test</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#initial_test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.initial_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Helper method used for analysing a couple of corpuses at once.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.process_corpus_highlevel">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">process_corpus_highlevel</tt><big>(</big><em>corpus_name</em>, <em>chop</em>, <em>cman='/home/john/AudioCorpus'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#process_corpus_highlevel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.process_corpus_highlevel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper for the <strong>process_highlevel</strong> method in order to process
+all files in a given <strong>corpus</strong> for a given <strong>chop</strong></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.createHighLevelChops.process_highlevel">
+<tt class="descclassname">hmosaic.scripts.createHighLevelChops.</tt><tt class="descname">process_highlevel</tt><big>(</big><em>corpus</em>, <em>filepath</em>, <em>chop</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/createHighLevelChops.html#process_highlevel"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.createHighLevelChops.process_highlevel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Utility method used to test the hierarchical system and create
+high level segments along with analysis and constituent units
+stored in a gaia dataset for a given <tt class="docutils literal"><span class="pre">corpus</span></tt> and file from that 
+<tt class="docutils literal"><span class="pre">corpus</span></tt> .</p>
+</dd></dl>
+
+</div>
+<div class="section" id="processtestdata-py">
+<h2>processTestData.py<a class="headerlink" href="#processtestdata-py" title="Permalink to this headline">¶</a></h2>
+<p>This module contains examples of functions to run experiments and gather data using
+the framework.</p>
+<span class="target" id="module-hmosaic.scripts.processTestData"></span><p>This is a commandline script for processing the test data.
+It calls segementation routines, analysis routines, etc. and stores
+all output in the test corpus. This module also contains some functions
+for gathering data during experiments.</p>
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.add_gender">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">add_gender</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#add_gender"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.add_gender" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks the analysis in <em>TEST_CORPUS</em> in order to ascertain the male/female
+values of each one. Those which score higher than 0.85 have their values 
+plus their name added to the db.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.add_to_db">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">add_to_db</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#add_to_db"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.add_to_db" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recreates the song table in the database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.analyse_essentia_files">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">analyse_essentia_files</tt><big>(</big><em>corpus_name='test_corpus'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#analyse_essentia_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.analyse_essentia_files" title="Permalink to this definition">¶</a></dt>
+<dd><p>Analyse all essentia units of segmentation type: <tt class="docutils literal"><span class="pre">chop</span></tt> in the test 
+corpus.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.analyse_essentia_units">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">analyse_essentia_units</tt><big>(</big><em>chop</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#analyse_essentia_units"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.analyse_essentia_units" title="Permalink to this definition">¶</a></dt>
+<dd><p>Analyse all essentia units of segmentation type: <tt class="docutils literal"><span class="pre">chop</span></tt> in the test 
+corpus.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.calc_similarity">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">calc_similarity</tt><big>(</big><em>graphs</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#calc_similarity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.calc_similarity" title="Permalink to this definition">¶</a></dt>
+<dd><p>This takes the graphs variable returned by the map_mosaics 
+function and calculates the average of the distance between 
+target and mosaics for each of the moods.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.check_gender">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">check_gender</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#check_gender"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.check_gender" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks the analysis in <em>TEST_CORPUS</em> in order to ascertain the male/female
+values of each one. Those which score higher than 0.85 are 
+added to a list which is returned</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.create_and_populate">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">create_and_populate</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#create_and_populate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.create_and_populate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recreates <strong>settings.TEST_CORPUS</strong> from the set of files in 
+<strong>settings.TEST_DATA_DIR</strong>, converts</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.create_db">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">create_db</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#create_db"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.create_db" title="Permalink to this definition">¶</a></dt>
+<dd><p>Recreates the database with the segment information</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.dataset_metrics">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">dataset_metrics</tt><big>(</big><em>graphs</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#dataset_metrics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.dataset_metrics" title="Permalink to this definition">¶</a></dt>
+<dd><p>This takes the graphs variable returned from the <em>map_mosaics</em> function 
+and transforms it, showing the distance between the pairs of mosaics for the two corpora.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.display_file_values">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">display_file_values</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#display_file_values"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.display_file_values" title="Permalink to this definition">¶</a></dt>
+<dd><p>Display an aribitrary set of descriptor values from analysis contained
+in <strong>settings.TEST_CORPUS</strong>. The descriptor keys ought to be passed 
+in <tt class="docutils literal"><span class="pre">args</span></tt></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.equalise">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">equalise</tt><big>(</big><em>seq1</em>, <em>seq2</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#equalise"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.equalise" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes two sequences finds out which one is longer and
+reduces elements from the end of this in order to make it
+the same length as the smaller one.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.gather_csv_data">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">gather_csv_data</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#gather_csv_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.gather_csv_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function gets given a corpus and extracts the descriptors 
+given in the <em>args</em> to the function. It records this data, 
+audio file name and segment duration.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.gather_db_data">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">gather_db_data</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#gather_db_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.gather_db_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function gets given a corpus and extracts the descriptors 
+for male, female, vocal and instrumental. It encapsulates this data, 
+along with audio file name, segment filepath and segment duration in a 
+<a href="#id24"><span class="problematic" id="id25">`</span></a>hmosaic.models.DBSegment object and then stores it in a 
+sqlite database.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.gender_breakdown">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">gender_breakdown</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#gender_breakdown"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.gender_breakdown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Process the results of the gender analysis experiments</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.map_mosaics">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">map_mosaics</tt><big>(</big><em>corpus_name</em>, <em>chop</em>, <em>from_scratch=False</em>, <em>hop=False</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#map_mosaics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.map_mosaics" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns dictionary containing mood values over time for all
+audio files in the test corpus. The resolution of the graphs can be 
+increased using the <strong>hop</strong> parameter
+(a value between 0 and 1 indicating overlap factor).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.run_gender_analysis">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">run_gender_analysis</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#run_gender_analysis"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.run_gender_analysis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Analyse the files in a corpus called <strong>gender</strong>
+in <strong>settings.TEST_CORPUS_REPO</strong>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.run_gender_report">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">run_gender_report</tt><big>(</big><em>*args</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#run_gender_report"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.run_gender_report" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks the database and runs a report. 
+We include vocal/instrumental and male/female. 
+Actual gender will have to be entered manually.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.run_tasks">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">run_tasks</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#run_tasks"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.run_tasks" title="Permalink to this definition">¶</a></dt>
+<dd><p>Very rough and ready set of instructions to process.
+Delete the test_corpus and start over, segment and analyse
+different chop sizes.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.segment">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">segment</tt><big>(</big><em>chop</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#segment"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.segment" title="Permalink to this definition">¶</a></dt>
+<dd><p>Segment all audio files in the test corpus according to <tt class="docutils literal"><span class="pre">chop</span></tt>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.processTestData.ttest_metrics">
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">ttest_metrics</tt><big>(</big><em>graphs</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#ttest_metrics"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.ttest_metrics" title="Permalink to this definition">¶</a></dt>
+<dd><p>This takes the graphs variable returned from the <em>map_mosaics</em> function 
+and transforms it, calculating ttests between the target and each mosaic.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="plotresults-py">
+<h2>plotResults.py<a class="headerlink" href="#plotresults-py" title="Permalink to this headline">¶</a></h2>
+<p>This module contains examples of functions to plot experimental results using matplotlib.</p>
+<span class="target" id="module-hmosaic.scripts.plotResults"></span><dl class="function">
+<dt id="hmosaic.scripts.plotResults.barChartIt">
+<tt class="descclassname">hmosaic.scripts.plotResults.</tt><tt class="descname">barChartIt</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/plotResults.html#barChartIt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.plotResults.barChartIt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Makes a bar chart based on the results of
+the gender analysis for songs and segments.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.plotResults.moodBarChart">
+<tt class="descclassname">hmosaic.scripts.plotResults.</tt><tt class="descname">moodBarChart</tt><big>(</big><em>mood</em>, <em>metrics=None</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/plotResults.html#moodBarChart"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.plotResults.moodBarChart" title="Permalink to this definition">¶</a></dt>
+<dd><p>PAss the metrics object in from the dataset_metrics function,
+along with a mood to pl</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.plotResults.plotPerfBars">
+<tt class="descclassname">hmosaic.scripts.plotResults.</tt><tt class="descname">plotPerfBars</tt><big>(</big><em>ll_array</em>, <em>full_array</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/plotResults.html#plotPerfBars"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.plotResults.plotPerfBars" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the normalised processing times and plot</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.plotResults.plot_mosaic_curves">
+<tt class="descclassname">hmosaic.scripts.plotResults.</tt><tt class="descname">plot_mosaic_curves</tt><big>(</big><em>g</em>, <em>key</em>, <em>tune</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/plotResults.html#plot_mosaic_curves"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.plotResults.plot_mosaic_curves" title="Permalink to this definition">¶</a></dt>
+<dd><p>Takes the graph from <strong>hmosaic.scripts.processTestData.map_mosaics</strong>,
+along with values for mood key and tune and plots the graphs.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="hmosaic.scripts.plotResults.scatterPlotIt">
+<tt class="descclassname">hmosaic.scripts.plotResults.</tt><tt class="descname">scatterPlotIt</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/plotResults.html#scatterPlotIt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.plotResults.scatterPlotIt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Makes scatterplots based on the results of
+the gender analysis for songs and segments.</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Overview</a></li>
+<li><a class="reference internal" href="#installation-instructions">Installation Instructions</a><ul>
+<li><a class="reference internal" href="#software-requirements">Software Requirements</a><ul>
+<li><a class="reference internal" href="#mandatory-software">Mandatory Software</a></li>
+<li><a class="reference internal" href="#optional-software">Optional Software</a></li>
+<li><a class="reference internal" href="#mandatory-python-modules">Mandatory Python Modules</a></li>
+<li><a class="reference internal" href="#optional-python-modules">Optional Python Modules</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installing-the-package">Installing the Package</a></li>
+<li><a class="reference internal" href="#configuring-the-package">Configuring the Package</a></li>
+<li><a class="reference internal" href="#testing-the-installation">Testing the Installation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#tour-of-the-pure-data-mosaicing-framework">Tour of the pure data mosaicing framework</a><ul>
+<li><a class="reference internal" href="#control-gui">Control GUI</a></li>
+<li><a class="reference internal" href="#corpus-selection">Corpus selection</a></li>
+<li><a class="reference internal" href="#segmentation">Segmentation</a><ul>
+<li><a class="reference internal" href="#aubio-note-segmentation">Aubio Note Segmentation</a></li>
+<li><a class="reference internal" href="#essentia-onsets-segmentation">Essentia Onsets Segmentation</a></li>
+<li><a class="reference internal" href="#bpm-based-segmentation">BPM based segmentation</a></li>
+<li><a class="reference internal" href="#fixed-length-segmentation">Fixed Length segmentation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#similarity-search">Similarity Search</a></li>
+<li><a class="reference internal" href="#settings-transformations-and-tracking">Settings, Transformations and Tracking</a><ul>
+<li><a class="reference internal" href="#target-tracking">Target Tracking</a></li>
+<li><a class="reference internal" href="#settings">Settings</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mosaic-looper">Mosaic Looper</a></li>
+<li><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-documentation">API documentation</a><ul>
+<li><a class="reference internal" href="#init-py">__init__.py</a></li>
+<li><a class="reference internal" href="#settings-py">settings.py</a></li>
+<li><a class="reference internal" href="#control-py">control.py</a></li>
+<li><a class="reference internal" href="#corpus-py">corpus.py</a></li>
+<li><a class="reference internal" href="#analyse-py">analyse.py</a></li>
+<li><a class="reference internal" href="#segment-py">segment.py</a></li>
+<li><a class="reference internal" href="#models-py">models.py</a></li>
+<li><a class="reference internal" href="#utils-py">utils.py</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scripts-documentation">Scripts documentation</a><ul>
+<li><a class="reference internal" href="#createcorpus-py">createCorpus.py</a></li>
+<li><a class="reference internal" href="#createhighlevelchops-py">createHighLevelChops.py</a></li>
+<li><a class="reference internal" href="#processtestdata-py">processTestData.py</a></li>
+<li><a class="reference internal" href="#plotresults-py">plotResults.py</a></li>
+</ul>
+</li>
+</ul>
+
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/index.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="#">hmosaic v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

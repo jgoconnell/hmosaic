@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.scripts.createHighLevelChops &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.scripts.createHighLevelChops</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span>
+<span class="kn">from</span> <span class="nn">hmosaic.settings</span> <span class="kn">import</span> <span class="n">SOURCE_REPO</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">switch_ext</span>
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+
+<span class="kn">from</span> <span class="nn">hmosaic.analyse</span> <span class="kn">import</span> <span class="n">EssentiaAnalyser</span><span class="p">,</span> <span class="n">EssentiaError</span>
+<span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">Mosaic</span><span class="p">,</span> <span class="n">MosaicUnit</span>
+<span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">DataSet</span><span class="p">,</span> <span class="n">transform</span>
+
+<div class="viewcode-block" id="gaia_transform"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.gaia_transform">[docs]</a><span class="k">def</span> <span class="nf">gaia_transform</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Takes a dict of point names and filepaths.</span>
+<span class="sd">        Creates a DataSet and performs the standard transformations </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="o">.</span><span class="n">mergeFiles</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;fixlength&#39;</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;cleaner&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span> <span class="n">get_unused_descriptors</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>   
+            <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="n">desc</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Problem removing this descriptor: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="s">&#39;normalize&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ds</span>
+</div>
+<div class="viewcode-block" id="get_unused_descriptors"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.get_unused_descriptors">[docs]</a><span class="k">def</span> <span class="nf">get_unused_descriptors</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets some descriptors which are not commonly used in order to remove</span>
+<span class="sd">        them from the analysis</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;rhythm.beats_position&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.bpm_estimates&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.bpm_intervals&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.onset_times&#39;</span><span class="p">,</span> 
+                 <span class="s">&#39;rhythm.rubato_start&#39;</span><span class="p">,</span> <span class="s">&#39;rhythm.rubato_stop&#39;</span><span class="p">,</span> 
+                <span class="p">]:</span>
+        <span class="k">yield</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span> <span class="p">[</span><span class="n">d</span><span class="p">]}</span>
+
+</div>
+<div class="viewcode-block" id="process_highlevel"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.process_highlevel">[docs]</a><span class="k">def</span> <span class="nf">process_highlevel</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Utility method used to test the hierarchical system and create</span>
+<span class="sd">        high level segments along with analysis and constituent units</span>
+<span class="sd">        stored in a gaia dataset for a given ``corpus`` and file from that </span>
+<span class="sd">        ``corpus`` .</span>
+<span class="sd">      </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">units</span> <span class="o">=</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">filepath</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">)</span>
+    <span class="n">new_segments</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">()</span>
+    <span class="n">analyser</span> <span class="o">=</span> <span class="n">EssentiaAnalyser</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">units</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)):</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Cannot find analysis, assume that this file is silent: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">u</span><span class="p">)</span>
+            <span class="k">continue</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">MosaicUnit</span><span class="p">(</span><span class="n">u</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Number of units in mosaic is: </span><span class="si">%d</span><span class="s">, length of mosaic is </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">units</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">))</span>
+        <span class="c"># This AND clause prevents a Gaia Dataset of only 1 Point being created.</span>
+        <span class="c"># The problem is that if the dataset only has one point then all </span>
+        <span class="c"># descriptors get removed during &#39;cleaner&#39; analysis</span>
+        <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">units</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span> 
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Current length of mosaic is </span><span class="si">%f</span><span class="s">, adding to list&quot;</span> <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+            <span class="n">new_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_segments</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s">&quot;Retrieved only 1 high level mosaic unit of length: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+        <span class="n">new_segments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">m</span> <span class="o">!=</span> <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;The final mosaic is of length </span><span class="si">%f</span><span class="s"> only&quot;</span> <span class="o">%</span> <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;The last mosaic has a length of: </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">m</span><span class="o">.</span><span class="n">length</span><span class="p">)</span>
+        <span class="n">m</span><span class="o">.</span><span class="n">merge_mosaics</span><span class="p">(</span><span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">new_segments</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">m</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Finished assembling units into segments of &gt; 5s&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;There are </span><span class="si">%d</span><span class="s"> segments in total to be processed for </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">new_segments</span><span class="p">),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)))</span>
+    <span class="n">highlevel_dir</span> <span class="o">=</span> <span class="n">corpus</span><span class="o">.</span><span class="n">_make_segments_dir</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">chop</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">seg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">new_segments</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">highlevel_dir</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%05d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">)</span>
+        <span class="n">seg</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Analysing audio: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+        <span class="n">analyser</span><span class="o">.</span><span class="n">analyse_audio</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="n">unit_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Segment has </span><span class="si">%d</span><span class="s"> units&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">seg</span><span class="o">.</span><span class="n">units</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">unit</span> <span class="ow">in</span> <span class="n">seg</span><span class="o">.</span><span class="n">units</span><span class="p">:</span>
+            <span class="c">#path_comps = os.path.split(os.path.dirname(unit.filepath))</span>
+            <span class="c">#chop_dir = path_comps[1]</span>
+            <span class="c">#name = os.path.split(path_comps[0])[1] + &#39;_&#39; + chop_dir + \</span>
+            <span class="c">#    &#39;_&#39; + switch_ext(os.path.basename(unit.filepath), &#39;&#39;)</span>
+            <span class="n">unit_dict</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">):</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)})</span>
+        <span class="n">tu_ds</span> <span class="o">=</span> <span class="n">gaia_transform</span><span class="p">(</span><span class="n">unit_dict</span><span class="p">)</span>
+        <span class="n">tu_ds</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">highlevel_dir</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%05d</span><span class="s">.db&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">))</span>
+
+    <span class="c">#corpus.create_gaia_db(chop=&#39;highlevel&#39;)</span>
+
+</div>
+<div class="viewcode-block" id="highlevel_mosaic"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.highlevel_mosaic">[docs]</a><span class="k">def</span> <span class="nf">highlevel_mosaic</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">tcorpus</span><span class="p">,</span> <span class="n">scorpus</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This will be used to test the highlevel mosaicing process.</span>
+<span class="sd">        The scope variable controls the number of results which are returned </span>
+<span class="sd">        for each target unit which is sought.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c"># Create a temporary file for the mosaic audio</span>
+    <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="s">&#39;temp_mosaic.wav&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">mosaic</span> <span class="o">=</span> <span class="n">Mosaic</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">cost</span> <span class="o">=</span> <span class="n">RepeatUnitCost</span><span class="p">()</span>
+    <span class="n">context</span> <span class="o">=</span> <span class="n">Context</span><span class="p">()</span>
+    <span class="n">gridder</span> <span class="o">=</span> <span class="n">Gridder</span><span class="p">()</span>
+    <span class="n">units</span> <span class="o">=</span> <span class="n">tcorpus</span><span class="o">.</span><span class="n">list_audio_units</span><span class="p">(</span><span class="n">audio_filename</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel&#39;</span><span class="p">)</span>
+    <span class="n">hdb</span> <span class="o">=</span> <span class="n">scorpus</span><span class="o">.</span><span class="n">get_gaia_unit_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">chop</span><span class="p">)</span>
+    <span class="n">distance</span> <span class="o">=</span> <span class="n">get_mood_distance</span><span class="p">(</span><span class="n">hdb</span><span class="p">)</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">hdb</span><span class="p">,</span> <span class="n">distance</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">units</span><span class="p">:</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">))</span>
+        <span class="n">unit_name</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> <span class="s">&#39;&#39;</span><span class="p">)</span>
+        <span class="n">p</span><span class="o">.</span><span class="n">setName</span><span class="p">(</span><span class="n">unit_name</span><span class="p">)</span>
+        <span class="n">p_m</span> <span class="o">=</span> <span class="n">hdb</span><span class="o">.</span><span class="n">history</span><span class="p">()</span><span class="o">.</span><span class="n">mapPoint</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">f</span><span class="p">:</span><span class="n">v</span><span class="o">.</span><span class="n">nnSearch</span><span class="p">(</span><span class="n">p_m</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">scope</span><span class="p">)})</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Ok, now we have a dict with each target segment, along with its corresponding nearest matches in source db&quot;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Check to see that we have every second of target audio accounted for - I think not!&quot;</span><span class="p">)</span> 
+    <span class="c">#return results</span>
+    <span class="c">#new_results = results.copy()</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="n">units</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">]:</span>
+            <span class="n">ds</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s">&#39;.db&#39;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">pointNames</span><span class="p">():</span>
+                <span class="n">units</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">new_ds</span> <span class="o">=</span> <span class="n">gaia_transform</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">units</span><span class="p">,</span> <span class="n">units</span><span class="p">)))</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">r</span><span class="p">:</span><span class="n">new_ds</span><span class="p">})</span>
+    <span class="c">#return results</span>
+    <span class="c"># Very important - target units must be in correct order</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">index_skip</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">results</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+        <span class="n">tds</span> <span class="o">=</span> <span class="n">DataSet</span><span class="p">()</span>
+        <span class="n">tds</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="s">&#39;.db&#39;</span><span class="p">))</span>
+        <span class="c">#return tds, results</span>
+        <span class="n">sds</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">]</span>
+        <span class="n">source_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">sds</span><span class="o">.</span><span class="n">layout</span><span class="p">()</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">())</span>
+        <span class="n">target_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">tds</span><span class="o">.</span><span class="n">layout</span><span class="p">()</span><span class="o">.</span><span class="n">descriptorNames</span><span class="p">())</span>
+        <span class="n">remove_from_source</span> <span class="o">=</span> <span class="n">source_set</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">target_set</span><span class="p">)</span>
+        <span class="n">remove_from_target</span> <span class="o">=</span> <span class="n">target_set</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">source_set</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will try to remove </span><span class="si">%s</span><span class="s"> from the source DataSet&quot;</span> <span class="o">%</span> <span class="n">remove_from_source</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">sds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span><span class="nb">list</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">)})</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Failed to remove </span><span class="si">%s</span><span class="s"> from source DataSet&quot;</span> <span class="o">%</span> <span class="nb">list</span><span class="p">(</span><span class="n">remove_from_source</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="n">tds</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Will try to remove </span><span class="si">%s</span><span class="s"> from the target DataSet&quot;</span> <span class="o">%</span> <span class="n">remove_from_source</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">tds</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">tds</span><span class="p">,</span> <span class="s">&#39;remove&#39;</span><span class="p">,</span> <span class="p">{</span><span class="s">&#39;descriptorNames&#39;</span><span class="p">:</span><span class="nb">list</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">)})</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Failed to remove </span><span class="si">%s</span><span class="s"> from target DataSet&quot;</span> <span class="o">%</span> <span class="nb">list</span><span class="p">(</span><span class="n">remove_from_target</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="n">tds</span>
+
+        <span class="n">sv</span> <span class="o">=</span> <span class="n">View</span><span class="p">(</span><span class="n">sds</span><span class="p">,</span> <span class="n">get_low_level_distance</span><span class="p">(</span><span class="n">sds</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Beginning to loop through units for this segment&quot;</span><span class="p">)</span>
+        <span class="c">#return tds, sds, gridder, sv</span>
+        <span class="k">for</span> <span class="n">pname</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">tds</span><span class="o">.</span><span class="n">pointNames</span><span class="p">()):</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            I don&#39;t think I need to map the point in this instance </span>
+<span class="sd">            as we have already transformed the DataSet.</span>
+<span class="sd">            try, analyse_corpus:</span>
+<span class="sd">                p_m = sds.history().mapPoint(p)</span>
+<span class="sd">            except Exception, e:</span>
+<span class="sd">                log.error(&quot;Error mapping %s to %s: %s&quot; % (p, sds, e))</span>
+<span class="sd">                return tds, p, sds</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">print</span> <span class="n">pname</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pname</span><span class="p">)</span> <span class="o">!=</span> <span class="s">&#39;</span><span class="si">%07d</span><span class="s">.yaml&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">):</span>
+                <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s">&quot;Current unit is </span><span class="si">%s</span><span class="s"> =&gt; Missing a unit &#39;</span><span class="si">%07d</span><span class="s">.yaml&#39;- it must be silent... Index is </span><span class="si">%d</span><span class="s">, index skip is </span><span class="si">%d</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pname</span><span class="p">,</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">),</span> <span class="n">index</span><span class="p">,</span> <span class="n">index_skip</span><span class="p">))</span>
+                <span class="n">u</span> <span class="o">=</span> <span class="n">MosaicUnit</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">pname</span><span class="p">),</span> <span class="s">&#39;</span><span class="si">%07d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="n">index_skip</span><span class="p">)))</span>
+                <span class="n">u</span><span class="o">.</span><span class="n">silent</span> <span class="o">=</span> <span class="bp">True</span>
+                <span class="n">mosaic</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+                <span class="n">index_skip</span> <span class="o">+=</span> <span class="mi">1</span>
+
+            <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">pname</span><span class="p">)</span>
+            <span class="n">p_m</span> <span class="o">=</span> <span class="n">sds</span><span class="o">.</span><span class="n">history</span><span class="p">()</span><span class="o">.</span><span class="n">mapPoint</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+            <span class="n">unit_results</span> <span class="o">=</span> <span class="n">sv</span><span class="o">.</span><span class="n">nnSearch</span><span class="p">(</span><span class="n">p_m</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;For </span><span class="si">%s</span><span class="s">, the closest matching points are: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pname</span><span class="p">,</span> <span class="n">unit_results</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Applying repition cost&quot;</span><span class="p">)</span>
+            <span class="n">unit_results</span> <span class="o">=</span> <span class="n">cost</span><span class="o">.</span><span class="n">get_results</span><span class="p">(</span><span class="n">unit_results</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Results are now: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">unit_results</span><span class="p">))</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Applying Context cost&quot;</span><span class="p">)</span>
+            <span class="n">unit_results</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">get_results</span><span class="p">(</span><span class="n">unit_results</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Results are now: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">unit_results</span><span class="p">))</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="n">unit_results</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Choosing this unit: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">)</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;.wav&#39;</span><span class="p">)</span>
+            <span class="n">su</span> <span class="o">=</span> <span class="n">MosaicUnit</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">tl</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s">&#39;length&#39;</span><span class="p">])</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Length of target unit is </span><span class="si">%f</span><span class="s">, length of chosen source unit is </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">tl</span><span class="p">,</span> <span class="n">su</span><span class="o">.</span><span class="n">length</span><span class="p">))</span>
+            <span class="n">selected</span> <span class="o">=</span> <span class="n">gridder</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">su</span><span class="p">,</span> <span class="n">tl</span><span class="p">)</span>  
+            <span class="n">mosaic</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">selected</span><span class="p">)</span>
+            <span class="n">context</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+       
+    <span class="k">return</span> <span class="n">mosaic</span>
+        
+
+   <span class="c"># Overall architecture of this mode should support low level and/or highlevel options.</span>
+   <span class="c"># The loudness and the beat skip are all highlevel features.</span>
+   <span class="c"># Two sets of constraints - highlevel + lowlevel.</span>
+   <span class="c"># Track continuity is also supported +  - maybe not...conditions (used to be context) - Just a small subset to begin</span>
+   <span class="c"># Continuity yes - This is low level - a certain set of features based on the signal</span>
+    
+
+
+</div>
+<div class="viewcode-block" id="initial_test"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.initial_test">[docs]</a><span class="k">def</span> <span class="nf">initial_test</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Helper method used for analysing a couple of corpuses at once.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">SOURCE_REPO</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">[</span><span class="s">&#39;melodies&#39;</span><span class="p">,</span> <span class="s">&#39;motown&#39;</span><span class="p">]:</span>
+        <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">((</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+            <span class="n">process_highlevel</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="s">&#39;onsets&#39;</span><span class="p">)</span>
+        <span class="n">corpus</span><span class="o">.</span><span class="n">create_gaia_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_onsets&#39;</span><span class="p">)</span>
+</div>
+<div class="viewcode-block" id="process_corpus_highlevel"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createHighLevelChops.process_corpus_highlevel">[docs]</a><span class="k">def</span> <span class="nf">process_corpus_highlevel</span><span class="p">(</span><span class="n">corpus_name</span><span class="p">,</span> <span class="n">chop</span><span class="p">,</span> <span class="n">cman</span><span class="o">=</span><span class="n">SOURCE_REPO</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper for the **process_highlevel** method in order to process</span>
+<span class="sd">        all files in a given **corpus** for a given **chop**    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">cman</span><span class="p">)</span>
+    <span class="n">corpus</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="n">corpus_name</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">corpus</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+        <span class="n">process_highlevel</span><span class="p">(</span><span class="n">corpus</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">chop</span><span class="o">=</span><span class="n">chop</span><span class="p">)</span>
+    <span class="n">corpus</span><span class="o">.</span><span class="n">create_gaia_db</span><span class="p">(</span><span class="n">chop</span><span class="o">=</span><span class="s">&#39;highlevel_</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">chop</span><span class="p">)</span>
+
+
+
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">initial_test</span><span class="p">()</span>  
+            
+    
+    
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

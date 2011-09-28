@@ -1,0 +1,51 @@
+#N canvas 715 168 551 475 10;
+#X obj 235 55 s crossfade;
+#X obj 235 31 f;
+#X obj 267 -76 r togglecrossfade;
+#X obj 267 -48 select 0 1;
+#X obj 301 -14 r fadelength;
+#X obj 145 18 s fadeupdate;
+#X obj 216 -17 t b f;
+#X obj 260 -17 t b b;
+#X floatatom 302 15 5 0 0 0 - - -;
+#X obj 20 167 cnv 15 120 200 empty empty empty 20 12 0 14 -4034 -66577
+0;
+#X obj 25 328 tgl 15 0 togglecrossfade togglecrossfade Cross_Fade 17
+5 0 8 -257985 -1 -1 1 1;
+#X obj 26 349 nbx 5 14 -1e+37 1e+37 0 0 fadelength empty empty 0 -8
+0 10 -257985 -1 -1 15 256;
+#X obj 25 303 tgl 15 0 repetitioncost empty Repetition_Cost 17 5 0
+8 -257985 -1 -1 0 1;
+#X obj 25 269 tgl 15 0 unitcontext empty Unit_Context 17 5 0 8 -257985
+-1 -1 0 1;
+#X obj 23 168 tgl 15 0 highlevel empty High_Level 17 5 0 8 -257985
+-1 -1 1 1;
+#X obj 24 204 nbx 5 14 1 100 0 0 highscope empty High_Level_Scope 0
+-8 0 8 -257985 -1 -1 30 256;
+#X obj 23 99 loadbang;
+#X msg 23 125 1;
+#X obj 26 240 nbx 5 14 1 100 0 0 lowscope empty Low_Level_Scope 0 -8
+0 8 -257985 -1 -1 15 256;
+#X obj 177 82 print crossfade is;
+#X msg 104 141 5;
+#X msg 231 259 15;
+#X connect 1 0 0 0;
+#X connect 1 0 19 0;
+#X connect 2 0 3 0;
+#X connect 3 0 6 0;
+#X connect 3 1 7 0;
+#X connect 4 0 8 0;
+#X connect 6 0 1 0;
+#X connect 6 1 1 1;
+#X connect 7 0 1 0;
+#X connect 7 1 8 0;
+#X connect 8 0 1 1;
+#X connect 16 0 17 0;
+#X connect 16 0 20 0;
+#X connect 16 0 21 0;
+#X connect 17 0 14 0;
+#X connect 17 0 10 0;
+#X connect 20 0 15 0;
+#X connect 20 0 18 0;
+#X connect 21 0 11 0;
+#X coords 0 -1 1 1 120 200 1 20 165;

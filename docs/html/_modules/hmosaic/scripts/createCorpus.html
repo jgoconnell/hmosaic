@@ -1,0 +1,210 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.scripts.createCorpus &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.scripts.createCorpus</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+<span class="c"># -*- coding: utf-8 -*-</span>
+
+<span class="c"># Standard library imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">from</span> <span class="nn">optparse</span> <span class="kn">import</span> <span class="n">OptionParser</span>
+<span class="kn">import</span> <span class="nn">simplejson</span> <span class="kn">as</span> <span class="nn">json</span>
+
+
+<span class="c"># Project imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">analyse_corpus</span><span class="p">,</span> <span class="n">analyse_corpus_files</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">convertAudio</span> <span class="k">as</span> <span class="n">ca</span>
+<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span><span class="p">,</span> <span class="n">CorpusExistsException</span>
+
+
+<div class="viewcode-block" id="create_corpus"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createCorpus.create_corpus">[docs]</a><span class="k">def</span> <span class="nf">create_corpus</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">chop</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a directory callled corpus in the same directory as filepath,</span>
+<span class="sd">        convert all the audio files, segment and analyse...</span>
+<span class="sd">        ffmpeg must be installed for Mp3 conversion to work </span>
+<span class="sd">    </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusExistsException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">delete_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">filepath</span><span class="p">),</span> 
+            <span class="s">&#39;corpus&#39;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">filepath</span><span class="p">)))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+        <span class="n">to_copy</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">repository</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusExistsException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">delete_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+            <span class="n">to_copy</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">repository</span><span class="p">)</span>
+            <span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;corpus&#39;</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">cm</span><span class="o">.</span><span class="n">repository</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">to_copy</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">c</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+
+    <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">location</span><span class="p">)</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">rename_wavs</span><span class="p">()</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">execute_flac_convert</span><span class="p">()</span>
+    <span class="n">ca</span><span class="o">.</span><span class="n">execute_mp3_convert</span><span class="p">()</span>
+   
+
+    <span class="k">if</span> <span class="n">chop</span> <span class="o">==</span> <span class="s">&#39;onsets&#39;</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">audio_file</span> <span class="ow">in</span> <span class="n">c</span><span class="o">.</span><span class="n">list_audio_files</span><span class="p">():</span>
+            <span class="n">c</span><span class="o">.</span><span class="n">segment_audio</span><span class="p">(</span><span class="n">audio_file</span><span class="p">,</span> <span class="n">chop</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+
+    <span class="n">analyse_corpus</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">chop</span><span class="p">)</span>
+    <span class="n">analyse_corpus_files</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+
+    
+</div>
+<div class="viewcode-block" id="parseCommandLineOptions"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.createCorpus.parseCommandLineOptions">[docs]</a><span class="k">def</span> <span class="nf">parseCommandLineOptions</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up the option parser and return onset_detection_type.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>    
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">OptionParser</span><span class="p">()</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-t&quot;</span><span class="p">,</span> <span class="s">&quot;--target&quot;</span><span class="p">,</span> \
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;File or directory from which to create the coorpus. (MANDATORY)&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-w&quot;</span><span class="p">,</span> <span class="s">&quot;--weights&quot;</span><span class="p">,</span> 
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;Set weights for the onset detectors: [hfc, complex, rms]. E.g. -w &#39;[1, 0.3, 0.4]&#39;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_option</span><span class="p">(</span><span class="s">&quot;-f&quot;</span><span class="p">,</span> <span class="s">&quot;--fixed&quot;</span><span class="p">,</span> 
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;Use fixed-length segmentation - supply a value in milliseconds e.g. 500, 1000, etc.&quot;</span><span class="p">)</span>
+
+    
+
+    <span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>   
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="o">.</span><span class="n">target</span> <span class="ow">or</span> <span class="ow">not</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">target</span><span class="p">)</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">target</span><span class="p">)):</span>
+        <span class="k">print</span> <span class="p">(</span><span class="s">&quot;Problem with the target file/directory: &#39;</span><span class="si">%s</span><span class="s">&#39;&quot;</span> <span class="o">%</span> <span class="n">options</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+        <span class="k">print</span> <span class="n">parser</span><span class="o">.</span><span class="n">print_help</span><span class="p">()</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">weights</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">&quot;Invalid format for weights: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">options</span><span class="o">.</span><span class="n">weights</span><span class="o">.</span><span class="n">help</span><span class="p">)</span>
+            <span class="k">raise</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c"># Default weights</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">]</span>
+     
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">fixed</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">chop</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">fixed</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">&quot;Invalid format for fixed: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">options</span><span class="o">.</span><span class="n">fixed</span><span class="o">.</span><span class="n">help</span><span class="p">)</span>
+            <span class="k">raise</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">chop</span> <span class="o">=</span> <span class="s">&#39;onsets&#39;</span>
+    
+    
+
+    <span class="k">return</span> <span class="n">options</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">chop</span>
+
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot; run this file as a script. &quot;&quot;&quot;</span>
+    <span class="n">filepath</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">chop</span> <span class="o">=</span> <span class="n">parseCommandLineOptions</span><span class="p">()</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">create_corpus</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">chop</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">&quot;Exception occurred: </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">raise</span>
+    
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

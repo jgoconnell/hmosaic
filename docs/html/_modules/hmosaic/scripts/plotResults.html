@@ -1,0 +1,275 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.scripts.plotResults &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.scripts.plotResults</h1><div class="highlight"><pre>
+<span class="c">#!/usr/bin/env python</span>
+
+<span class="c"># Third party imports </span>
+<span class="kn">from</span> <span class="nn">pylab</span> <span class="kn">import</span> <span class="n">show</span><span class="p">,</span> <span class="n">plot</span><span class="p">,</span> <span class="n">legend</span><span class="p">,</span> <span class="n">xlim</span><span class="p">,</span> <span class="n">xlabel</span><span class="p">,</span> <span class="n">ylabel</span><span class="p">,</span> <span class="n">title</span><span class="p">,</span> <span class="n">figure</span><span class="p">,</span> <span class="n">scatter</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+
+<span class="c"># Project imports</span>
+<span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">get_db_connection</span>
+<span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">DBSegment</span><span class="p">,</span> <span class="n">DBSong</span>
+<span class="kn">from</span> <span class="nn">hmosaic.scripts.processTestData</span> <span class="kn">import</span> <span class="n">map_mosaics</span><span class="p">,</span> <span class="n">dataset_metrics</span>
+
+
+<div class="viewcode-block" id="scatterPlotIt"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.plotResults.scatterPlotIt">[docs]</a><span class="k">def</span> <span class="nf">scatterPlotIt</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Makes scatterplots based on the results of</span>
+<span class="sd">        the gender analysis for songs and segments.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">get_db_connection</span>
+    <span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">DBSegment</span><span class="p">,</span> <span class="n">DBSong</span>
+
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">(</span><span class="s">&#39;gender24.db&#39;</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">((</span><span class="n">DBSegment</span><span class="p">,</span> <span class="n">DBSong</span><span class="p">),</span><span class="n">DBSegment</span><span class="o">.</span><span class="n">song_name</span> <span class="o">==</span> <span class="n">DBSong</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+    <span class="n">handles</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">myColors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;Male &lt;-----&gt; Female (Segments)&#39;</span><span class="p">)</span>
+    <span class="n">ylabel</span><span class="p">(</span><span class="s">&#39;Male &lt;-----&gt; Female (Songs)&#39;</span><span class="p">)</span>
+    <span class="n">title</span><span class="p">(</span><span class="s">&#39;Time resolution of the Gender classifier&#39;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">segment_duration</span> <span class="o">==</span> <span class="mi">2000</span><span class="p">:</span>
+            <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scatter</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s">&#39;blue&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">))</span>
+            <span class="n">myColors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;blue&#39;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">segment_duration</span> <span class="o">==</span> <span class="mi">4000</span><span class="p">:</span>
+            <span class="n">handles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">scatter</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">female</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s">&#39;green&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">))</span>
+            <span class="n">myColors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s">&#39;green&#39;</span><span class="p">)</span>
+    <span class="c">#legend(handles)</span>
+</div>
+<div class="viewcode-block" id="barChartIt"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.plotResults.barChartIt">[docs]</a><span class="k">def</span> <span class="nf">barChartIt</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Makes a bar chart based on the results of</span>
+<span class="sd">        the gender analysis for songs and segments.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">store</span> <span class="o">=</span> <span class="n">get_db_connection</span><span class="p">(</span><span class="s">&#39;gender24.db&#39;</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">find</span><span class="p">((</span><span class="n">DBSegment</span><span class="p">,</span> <span class="n">DBSong</span><span class="p">),</span><span class="n">DBSegment</span><span class="o">.</span><span class="n">song_name</span> <span class="o">==</span> <span class="n">DBSong</span><span class="o">.</span><span class="n">song_name</span><span class="p">)</span>
+
+    <span class="n">results</span>
+    <span class="n">correct_segs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">incorrect_segs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">female</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">female</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                <span class="n">correct_segs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">incorrect_segs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">male</span> <span class="o">&gt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                <span class="n">correct_segs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">incorrect_segs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">correct_4secs</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">correct_segs</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">segment_duration</span><span class="o">==</span><span class="mi">4000</span><span class="p">]</span>
+    <span class="n">correct_2secs</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">correct_segs</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">segment_duration</span><span class="o">==</span><span class="mi">2000</span><span class="p">]</span>
+    <span class="n">incorrect_2secs</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">incorrect_segs</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">segment_duration</span><span class="o">==</span><span class="mi">2000</span><span class="p">]</span>
+    <span class="n">incorrect_4secs</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">incorrect_segs</span> <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">segment_duration</span><span class="o">==</span><span class="mi">4000</span><span class="p">]</span>
+    <span class="n">total_2secs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">correct_2secs</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">incorrect_2secs</span><span class="p">)</span>
+    <span class="n">total_4secs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">correct_4secs</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">incorrect_4secs</span><span class="p">)</span>
+    <span class="n">p2correct</span> <span class="o">=</span> <span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">correct_2secs</span><span class="p">)))</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">total_2secs</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">p2incorrect</span> <span class="o">=</span> <span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">incorrect_2secs</span><span class="p">)))</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">total_2secs</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">p4correct</span> <span class="o">=</span> <span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">correct_4secs</span><span class="p">)))</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">total_4secs</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">p4incorrect</span> <span class="o">=</span> <span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">incorrect_4secs</span><span class="p">)))</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="n">total_4secs</span><span class="p">))</span> <span class="o">*</span> <span class="mi">100</span>
+
+    
+    <span class="n">N</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="mf">0.35</span>
+    <span class="n">ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+    <span class="n">correct</span> <span class="o">=</span> <span class="p">(</span><span class="n">p2correct</span><span class="p">,</span> <span class="n">p4correct</span><span class="p">)</span>
+    <span class="n">incorrect</span> <span class="o">=</span> <span class="p">(</span><span class="n">p2incorrect</span><span class="p">,</span> <span class="n">p4incorrect</span><span class="p">)</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">figure</span><span class="p">()</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+    <span class="n">rects1</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span> <span class="n">correct</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;green&#39;</span><span class="p">)</span>
+    <span class="n">rects2</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="o">+</span><span class="n">width</span><span class="p">,</span> <span class="n">incorrect</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;red&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s">&#39;</span><span class="si">% o</span><span class="s">f segments classified&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s">&#39;</span><span class="si">% o</span><span class="s">f correctly and incorrectly classified segments by duration&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="n">ind</span><span class="o">+</span><span class="n">width</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xticklabels</span><span class="p">((</span><span class="s">&#39;2 second duration</span><span class="se">\n</span><span class="s"> Total of </span><span class="si">%d</span><span class="s"> segments&#39;</span> <span class="o">%</span> <span class="n">total_2secs</span><span class="p">,</span> <span class="s">&#39;4 second duration</span><span class="se">\n</span><span class="s"> Total of </span><span class="si">%d</span><span class="s"> segments&#39;</span> <span class="o">%</span> <span class="n">total_4secs</span><span class="p">))</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">((</span><span class="n">rects1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rects2</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="p">(</span><span class="s">&#39;Correct&#39;</span><span class="p">,</span> <span class="s">&#39;Incorrect&#39;</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="moodBarChart"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.plotResults.moodBarChart">[docs]</a><span class="k">def</span> <span class="nf">moodBarChart</span><span class="p">(</span><span class="n">mood</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        PAss the metrics object in from the dataset_metrics function,</span>
+<span class="sd">        along with a mood to pl</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">metrics</span> <span class="ow">is</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">map_mosaics</span><span class="p">(</span><span class="s">&#39;moodexperiment&#39;</span><span class="p">,</span> <span class="mi">5000</span><span class="p">,</span> <span class="bp">False</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">)</span>
+        <span class="n">metrics</span> <span class="o">=</span> <span class="n">dataset_metrics</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+    
+    <span class="n">N</span> <span class="o">=</span> <span class="mi">28</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="mf">0.2</span>
+    <span class="n">ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+    <span class="c">#hlp = re.compile(&#39;hl.+MOSAIC.wav&#39;)</span>
+    <span class="c">#llp = re.compile(&#39;ll.+MOSAIC.wav&#39;)</span>
+    <span class="nb">map</span><span class="p">(</span><span class="nb">list</span><span class="o">.</span><span class="n">sort</span><span class="p">,</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">]</span> 
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]])</span>
+    <span class="n">llScores</span> <span class="o">=</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> 
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]]</span>
+    <span class="n">hlScores</span> <span class="o">=</span> <span class="p">[</span><span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">][</span><span class="n">t</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> 
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]]</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">metrics</span><span class="p">[</span><span class="n">mood</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]</span>
+    <span class="nb">map</span><span class="p">(</span><span class="nb">list</span><span class="o">.</span><span class="n">sort</span><span class="p">,</span> <span class="p">[</span><span class="n">labels</span><span class="p">,</span> <span class="n">hlScores</span><span class="p">,</span> <span class="n">llScores</span><span class="p">])</span>
+    <span class="n">combscores</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">([</span><span class="nb">float</span><span class="p">((</span><span class="mi">1</span><span class="o">-</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="mi">100</span><span class="p">)</span> 
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">llScores</span><span class="p">],</span> 
+            <span class="p">[</span><span class="nb">float</span><span class="p">((</span><span class="mi">1</span><span class="o">-</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="mi">100</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">hlScores</span><span class="p">])</span>
+    <span class="n">better</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">combscores</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">better</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">figure</span><span class="p">()</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+    <span class="n">rects1</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span> <span class="p">[</span><span class="nb">float</span><span class="p">((</span><span class="mi">1</span><span class="o">-</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="mi">100</span><span class="p">)</span> 
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">hlScores</span><span class="p">],</span> <span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;green&#39;</span><span class="p">)</span>
+    <span class="n">rects2</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="o">+</span><span class="n">width</span><span class="p">,</span> <span class="p">[</span><span class="nb">float</span><span class="p">((</span><span class="mi">1</span><span class="o">-</span><span class="n">s</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">*</span><span class="mi">100</span><span class="p">)</span> 
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">llScores</span><span class="p">],</span> <span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;yellow&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s">&#39;Similarity to Target (%)&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s">&#39;Hierachical and Non-Hierarchical Mosaics for each </span><span class="si">%s</span><span class="s"> target in the dataset&#39;</span> <span class="o">%</span> <span class="n">mood</span><span class="p">)</span>
+    <span class="c">#ax.set_title(&#39;Hierarchical model performs better in %d out of 28 cases&#39; % (better))</span>
+    <span class="c">#ax.set_xticks(ind+width)</span>
+    <span class="c">#ax.set_xticklabels(labels)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">((</span><span class="n">rects1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rects2</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> 
+        <span class="p">(</span><span class="s">&#39;Hierchical Model&#39;</span><span class="p">,</span> <span class="s">&#39;Non-Hierarchical Model&#39;</span><span class="p">))</span>
+    
+    </div>
+<div class="viewcode-block" id="plotPerfBars"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.plotResults.plotPerfBars">[docs]</a><span class="k">def</span> <span class="nf">plotPerfBars</span><span class="p">(</span><span class="n">ll_array</span><span class="p">,</span> <span class="n">full_array</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Get the normalised processing times and plot</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    
+    <span class="n">N</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">width</span> <span class="o">=</span> <span class="mf">0.35</span>
+    <span class="n">ind</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+    
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">figure</span><span class="p">()</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+    <span class="n">rects1</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="p">,</span> <span class="n">full_array</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;green&#39;</span><span class="p">,</span> <span class="n">yerr</span><span class="o">=</span><span class="n">full_array</span><span class="o">.</span><span class="n">std</span><span class="p">())</span>
+    <span class="n">rects2</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">ind</span><span class="o">+</span><span class="n">width</span><span class="p">,</span> <span class="n">ll_array</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s">&#39;yellow&#39;</span><span class="p">,</span> <span class="n">yerr</span><span class="o">=</span><span class="n">ll_array</span><span class="o">.</span><span class="n">std</span><span class="p">())</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s">&#39;Average Processing Time Normalised by Audio Length&#39;</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s">&#39;Performance comparision - with and without high level descriptors&#39;</span><span class="p">)</span>
+    
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xticks</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">+</span><span class="n">width</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xticklabels</span><span class="p">([</span><span class="s">&#39;&#39;</span><span class="p">])</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">((</span><span class="n">rects1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">rects2</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> 
+        <span class="p">(</span><span class="s">&#39;Full Extractor&#39;</span><span class="p">,</span> <span class="s">&#39;Low Level Extractor&#39;</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="plot_mosaic_curves"><a class="viewcode-back" href="../../../index.html#hmosaic.scripts.plotResults.plot_mosaic_curves">[docs]</a><span class="k">def</span> <span class="nf">plot_mosaic_curves</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">tune</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Takes the graph from **hmosaic.scripts.processTestData.map_mosaics**,</span>
+<span class="sd">        along with values for mood key and tune and plots the graphs.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">hl</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s">&#39;HL&#39;</span><span class="o">+</span><span class="n">tune</span><span class="o">+</span><span class="s">&#39;.wav&#39;</span><span class="p">]</span>
+    <span class="n">ll</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s">&#39;LL&#39;</span><span class="o">+</span><span class="n">tune</span><span class="o">+</span><span class="s">&#39;.wav&#39;</span><span class="p">]</span>
+    <span class="n">tar</span>  <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s">&#39;TARGET.wav&#39;</span><span class="p">]</span>
+    <span class="n">limit</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">len</span><span class="p">,</span> <span class="p">[</span><span class="n">hl</span><span class="p">,</span><span class="n">ll</span><span class="p">,</span><span class="n">tar</span><span class="p">]))</span>
+    <span class="n">title</span><span class="p">(</span><span class="s">&quot;</span><span class="si">%s</span><span class="s"> mood curves over time for </span><span class="si">%s</span><span class="s">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">tune</span><span class="p">))</span>
+    <span class="n">xlim</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="n">limit</span><span class="p">)</span>
+    <span class="n">ylabel</span><span class="p">(</span><span class="s">&quot;</span><span class="si">%s</span><span class="s"> Value&quot;</span> <span class="o">%</span> <span class="n">key</span><span class="p">)</span>
+    <span class="n">xlabel</span><span class="p">(</span><span class="s">&#39;Number of 5 second segments analysed&#39;</span><span class="p">)</span>
+    <span class="n">plot</span><span class="p">(</span><span class="n">tar</span><span class="p">,</span> <span class="s">&#39;r&#39;</span><span class="p">)</span>
+    <span class="n">plot</span><span class="p">(</span><span class="n">ll</span><span class="p">,</span> <span class="s">&#39;b&#39;</span><span class="p">)</span>
+    <span class="n">plot</span><span class="p">(</span><span class="n">hl</span><span class="p">,</span> <span class="s">&#39;g&#39;</span><span class="p">)</span>
+    <span class="n">labels</span> <span class="o">=</span> <span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">,</span> <span class="s">&#39;non-hierarchical&#39;</span><span class="p">,</span> <span class="s">&#39;hierarchical&#39;</span><span class="p">)</span>
+    <span class="n">legend</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span> 
+
+</div>
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">&#39;__main__&#39;</span><span class="p">:</span>
+    
+    <span class="n">barChartIt</span><span class="p">()</span>
+    <span class="n">show</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,90 @@
+#N canvas 95 48 1055 496 10;
+#X obj 313 405 f;
+#X obj 126 411 pack s f;
+#X obj 182 411 print packed;
+#X obj 224 540 t l;
+#X obj 126 537 list append;
+#X text 253 539 Store the list;
+#X obj 223 579 print stored;
+#X obj 16 521 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144 -1
+-1;
+#X obj 40 537 list prepend;
+#X text -15 520 Send;
+#X obj 216 506 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X text 242 506 Clear;
+#X obj 312 327 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X obj 226 266 t f b;
+#X obj 25 108 select 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17;
+#X text 310 305 Append descriptor;
+#X msg -200 159 mood_happy.all.happy;
+#X msg -201 187 mood_sad.all.sad;
+#X msg -200 240 mood_relaxed.all.relaxed;
+#X obj 374 389 r \$0_weight;
+#X obj 530 341 cnv 15 250 240 empty empty empty 20 12 0 14 -260097
+-66577 0;
+#X obj 540 364 vradio 15 1 0 8 empty empty High_Level_Similarity_Parameters
+0 -8 0 8 -4160 -1 -4160 0;
+#X obj 724 385 hsl 30 15 0 1 0 0 \$0_weight empty Weight -2 -8 0 10
+-257985 -1 -1 0 1;
+#X floatatom 733 405 5 0 0 0 - - -;
+#X text 561 360 happiness;
+#X text 562 375 sadness;
+#X text 560 390 aggressiveness;
+#X obj 734 451 bng 30 250 50 0 \$0_clear empty Clear 0 -7 0 10 -4034
+-1 -1;
+#X obj 681 452 bng 30 250 50 0 \$0_send empty Send 0 -7 0 10 -4034
+-1 -1;
+#X obj 190 482 r \$0_clear;
+#X obj 40 504 r \$0_send;
+#X msg -200 213 mood_aggressive.all.aggressive;
+#X text 560 405 relaxedness;
+#X obj -123 623 print hlconstraints:;
+#X text 561 422 male;
+#X text 559 438 female;
+#X text 560 452 vocal;
+#X text 558 467 instrumental;
+#X msg -199 289 gender.all.male;
+#X msg -198 314 gender.all.female;
+#X msg -199 343 voice_instrumental.all.vocal;
+#X msg -199 370 voice_instrumental.all.instrumental;
+#X obj 40 574 s sethlconstraints;
+#X connect 0 0 1 1;
+#X connect 1 0 2 0;
+#X connect 1 0 4 0;
+#X connect 3 0 4 1;
+#X connect 4 0 3 0;
+#X connect 4 0 6 0;
+#X connect 4 0 8 1;
+#X connect 7 0 8 0;
+#X connect 8 0 33 0;
+#X connect 8 0 42 0;
+#X connect 10 0 4 1;
+#X connect 10 0 8 1;
+#X connect 12 0 0 0;
+#X connect 13 0 14 0;
+#X connect 13 1 0 0;
+#X connect 14 0 16 0;
+#X connect 14 1 17 0;
+#X connect 14 2 31 0;
+#X connect 14 3 18 0;
+#X connect 14 4 38 0;
+#X connect 14 5 39 0;
+#X connect 14 6 40 0;
+#X connect 14 7 41 0;
+#X connect 16 0 1 0;
+#X connect 17 0 1 0;
+#X connect 18 0 1 0;
+#X connect 19 0 0 1;
+#X connect 21 0 13 0;
+#X connect 22 0 23 0;
+#X connect 29 0 4 1;
+#X connect 29 0 8 1;
+#X connect 30 0 8 0;
+#X connect 31 0 1 0;
+#X connect 38 0 1 0;
+#X connect 39 0 1 0;
+#X connect 40 0 1 0;
+#X connect 41 0 1 0;
+#X coords 0 -1 1 1 250 240 2 530 340;

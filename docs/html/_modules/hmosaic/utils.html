@@ -1,0 +1,275 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>hmosaic.utils &mdash; hmosaic v0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="top" title="hmosaic v0.1 documentation" href="../../index.html" />
+    <link rel="up" title="Module code" href="../index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" accesskey="U">Module code</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <h1>Source code for hmosaic.utils</h1><div class="highlight"><pre>
+<span class="c"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Contains functions which are repeatedly used by different parts of </span>
+<span class="sd">the framework.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">from</span> <span class="nn">gaia2</span> <span class="kn">import</span> <span class="n">Point</span>
+<span class="kn">from</span> <span class="nn">scikits.audiolab</span> <span class="kn">import</span> <span class="n">wavwrite</span>
+
+<span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span>
+<span class="kn">from</span> <span class="nn">storm.sqlobject</span> <span class="kn">import</span> <span class="n">Store</span>
+<span class="kn">from</span> <span class="nn">storm.database</span> <span class="kn">import</span> <span class="n">create_database</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># AUDIO SIGNAL PROCESSING UTILITY FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+
+<div class="viewcode-block" id="to_mono"><a class="viewcode-back" href="../../index.html#hmosaic.utils.to_mono">[docs]</a><span class="k">def</span> <span class="nf">to_mono</span><span class="p">(</span><span class="n">audio_data</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Accepts an array of audio data and converts it to mono, ensuring that</span>
+<span class="sd">        it is represented as an array of 32bit floating point numbers.</span>
+<span class="sd">        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">audio_data</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Audio data is already mono, doing nothing.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">audio_data</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">mono_array</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">audio_data</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">audio_data</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Audio data is multichannel...&quot;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Convert to mono by taking the mean of the first 2 channels&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mono_array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s">&#39;single&#39;</span><span class="p">)</span>
+        
+        
+<span class="c"># Returns a chop value in ms from the bpm value.        </span></div>
+<span class="n">calc_chop_from_bpm</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">bpm</span><span class="p">:</span> <span class="nb">int</span><span class="p">((</span><span class="mi">60</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span> <span class="o">/</span> <span class="nb">float</span><span class="p">(</span><span class="n">bpm</span><span class="p">))</span> 
+
+<span class="c"># Returns the no of samples given a sample rate and a time in seconds.</span>
+<span class="n">secs_to_samps</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">time</span><span class="p">,</span> <span class="n">sr</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">time</span><span class="o">*</span><span class="n">sr</span><span class="p">))</span>
+
+<span class="c"># Converts the chop size in samples to milliseconds</span>
+<span class="n">chop_to_ms</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">sr</span><span class="p">,</span> <span class="n">chop</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">sr</span><span class="o">*</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">chop</span><span class="p">)</span><span class="o">/</span><span class="nb">float</span><span class="p">(</span><span class="mi">1000</span><span class="p">)))</span>
+
+<span class="c"># Returns onset times in seconds as an array of 32bit floating point numbers</span>
+<span class="n">get_fixed_onsets</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">chop</span><span class="p">,</span> <span class="n">length</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span>
+    <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">((</span><span class="n">x</span> <span class="o">*</span> <span class="n">chop</span><span class="p">)</span><span class="o">/</span><span class="mf">1000.0</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="n">length</span><span class="o">/</span><span class="n">chop</span><span class="p">)),</span> <span class="s">&#39;single&#39;</span><span class="p">)</span>
+       
+
+
+<span class="c">###############################################################################</span>
+<span class="c"># FILESYSTEM RELATED UTILITY FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+
+<span class="n">get_directories</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">path</span><span class="p">:</span> <span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> \
+            <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s">&#39;*&#39;</span><span class="p">)))</span>
+
+<div class="viewcode-block" id="most_recent_first"><a class="viewcode-back" href="../../index.html#hmosaic.utils.most_recent_first">[docs]</a><span class="k">def</span> <span class="nf">most_recent_first</span><span class="p">(</span><span class="n">paths</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Orders a list of filepaths by most recently modified first.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">timestamped_paths</span> <span class="o">=</span> <span class="p">[(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getmtime</span><span class="p">(</span><span class="n">f</span><span class="p">),</span> <span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">]</span>
+    <span class="n">timestamped_paths</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="n">timestamped_paths</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">f</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">timestamped_paths</span><span class="p">]</span>
+            </div>
+<div class="viewcode-block" id="get_files_recursive"><a class="viewcode-back" href="../../index.html#hmosaic.utils.get_files_recursive">[docs]</a><span class="k">def</span> <span class="nf">get_files_recursive</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="s">&#39;.wav&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generator to finds all files with extension &#39;ext&#39;</span>
+<span class="sd">            </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">filepaths</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filepath</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">ext</span><span class="p">:</span>
+                <span class="n">filepaths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="n">filepaths</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">filepaths</span>
+    
+    
+<span class="c">###############################################################################</span>
+<span class="c"># STRING PROCESSING RELATED UTILITY FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+    </div>
+<div class="viewcode-block" id="wav_timestamp"><a class="viewcode-back" href="../../index.html#hmosaic.utils.wav_timestamp">[docs]</a><span class="k">def</span> <span class="nf">wav_timestamp</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Returns a filename or path renamed to contain a timestamp, unique</span>
+<span class="sd">            to the minute...</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">switch_ext</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%d%d%d%d%d</span><span class="s">.wav&#39;</span> 
+            <span class="o">%</span> <span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">year</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">month</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">hour</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">minute</span><span class="p">,</span> <span class="n">t</span><span class="o">.</span><span class="n">second</span><span class="p">))</span>
+</div>
+<span class="n">switch_ext</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">name</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">name</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">ext</span>
+
+<div class="viewcode-block" id="load_yaml"><a class="viewcode-back" href="../../index.html#hmosaic.utils.load_yaml">[docs]</a><span class="k">def</span> <span class="nf">load_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">analysis_filepath</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Uses yaml to return a dictionary of analysis values </span>
+<span class="sd">            given an ``analysis_filepath``</span>
+<span class="sd">            </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">switch_ext</span><span class="p">(</span><span class="n">analysis_filepath</span><span class="p">,</span> <span class="s">&#39;.yaml&#39;</span><span class="p">)))</span>
+</div>
+<div class="viewcode-block" id="prepare_thresholds"><a class="viewcode-back" href="../../index.html#hmosaic.utils.prepare_thresholds">[docs]</a><span class="k">def</span> <span class="nf">prepare_thresholds</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            A decorator to clean the thresholds string and pass it</span>
+<span class="sd">            to the function.</span>
+
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">wrapped_func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s">&#39;WHERE &#39;</span><span class="p">):</span>
+                <span class="n">thresholds</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s">&#39;WHERE &#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">thresholds</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">thresholds</span>
+        <span class="k">return</span> <span class="n">wrapped_func</span>
+
+<span class="c">###############################################################################</span>
+<span class="c"># DATABASE RELATED UTILITY FUNCTIONS</span>
+<span class="c">###############################################################################</span>
+    
+</div>
+<div class="viewcode-block" id="get_db_connection"><a class="viewcode-back" href="../../index.html#hmosaic.utils.get_db_connection">[docs]</a><span class="k">def</span> <span class="nf">get_db_connection</span><span class="p">(</span><span class="n">dbname</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Opens a connection to the database. The db is assumed to be in </span>
+<span class="sd">        the same directory. Returns a ``Store`` interface to the db.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">db</span> <span class="o">=</span> <span class="n">create_database</span><span class="p">(</span><span class="s">&#39;sqlite:</span><span class="si">%s</span><span class="s">&#39;</span> <span class="o">%</span> <span class="n">dbname</span><span class="p">)</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">Store</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">store</span>
+</div>
+<div class="viewcode-block" id="get_gaia_point"><a class="viewcode-back" href="../../index.html#hmosaic.utils.get_gaia_point">[docs]</a><span class="k">def</span> <span class="nf">get_gaia_point</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tries to load an essentia yaml analysis file (specified in `filepath`)</span>
+<span class="sd">        as a gaia point.</span>
+<span class="sd">    &quot;&quot;&quot;</span> 
+    <span class="n">p</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">p</span>
+</div>
+<div class="viewcode-block" id="timestretch"><a class="viewcode-back" href="../../index.html#hmosaic.utils.timestretch">[docs]</a><span class="k">def</span> <span class="nf">timestretch</span><span class="p">(</span><span class="n">unit</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">sr</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Stretches a `hmosaic.models.MosaicUnit` to the given **length** </span>
+<span class="sd">        for the specified sample rate, **sr**.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">silent</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Unit is silent - no need to timestretch!&quot;</span><span class="p">)</span>
+        <span class="n">unit</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">secs_to_samps</span><span class="p">(</span><span class="n">length</span><span class="p">,</span> <span class="n">sr</span><span class="p">),</span> <span class="s">&#39;single&#39;</span><span class="p">)</span>
+        <span class="n">unit</span><span class="o">.</span><span class="n">recalculate</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">unit</span>
+                
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Stretching unit of length: </span><span class="si">%f</span><span class="s"> to </span><span class="si">%f</span><span class="s">&quot;</span> <span class="o">%</span> 
+         <span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">length</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="mi">33</span>
+    <span class="n">wavwrite</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="s">&#39;</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> <span class="n">sr</span><span class="p">)</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;rubberband&#39;</span><span class="p">,</span> <span class="s">&#39;-D&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">length</span><span class="p">),</span> <span class="s">&#39;</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">,</span> \
+            <span class="s">&#39;</span><span class="si">%d</span><span class="s">_stretch.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">]</span>
+    <span class="n">process</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> \
+            <span class="n">stderr</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="p">(</span><span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span><span class="p">)</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">communicate</span><span class="p">()</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Appending stretched unit to the mosaic&quot;</span><span class="p">)</span>
+    <span class="n">unit</span><span class="o">.</span><span class="n">set_filepath</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%d</span><span class="s">_stretch.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s">&quot;Removing temporary files: </span><span class="si">%d</span><span class="s">.wav, </span><span class="si">%d</span><span class="s">_stretch.wav&quot;</span> 
+           <span class="o">%</span> <span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">index</span><span class="p">))</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%d</span><span class="s">.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s">&#39;</span><span class="si">%d</span><span class="s">_stretch.wav&#39;</span> <span class="o">%</span> <span class="n">index</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">unit</span>
+</pre></div></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li><a href="../../index.html">hmosaic v0.1 documentation</a> &raquo;</li>
+          <li><a href="../index.html" >Module code</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, John O&#39;Connell.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
+    </div>
+  </body>
+</html>
