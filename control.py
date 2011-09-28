@@ -99,9 +99,6 @@ class Target(object):
 
 class HighLevelControl(object):
     """
-        A python Object to control the mosaicing process.
-        Can be run as a daemon sending and receiving on OSC or programatically.
-
     """
 
     def __init__(self, source_manager, daemon=True):
@@ -147,7 +144,7 @@ class HighLevelControl(object):
         self.con_cost = False
         
 
-        # Set up the target corpora
+        # Set up the target corpi
         self.cm = FileCorpusManager(settings.TARGET_REPO)
         self.temp_corpus = self.cm.load_corpus('temp')
         self.context_corpus = self.cm.load_corpus('context')
@@ -731,6 +728,8 @@ class HighLevelControl(object):
                 process_corpus_highlevel(os.path.basename(
                     self.source_corpus.location), self.chop
                 )
+                hdb = self.source_corpus.get_gaia_unit_db(chop='highlevel_%s' % self.chop)
+                
             distance = self._get_distance(hdb, 'highlevel')
             v = View(hdb, distance)
             results = {}
