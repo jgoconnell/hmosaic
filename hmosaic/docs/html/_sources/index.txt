@@ -39,7 +39,7 @@ Mandatory Software
 
 *Note:* You will need access to both the essentia and gaia source code. When compiling, the python wrappers for both libraries must also be installed.
 When you compile the essentia source code a binary streaming_extractor will be created. For more information on this process and all the software requirements please see the documentation for essentia and gaia. 
-You will need to copy the streaming_extractor into the analyser directory in the hmosaic source package, along with the entire svm_models directory which comes with the essentia source code.
+You will need to copy the streaming_extractor, along with the entire svm_models directory which comes with the essentia source code into a directory configured in ``settings.py`` as described below so that hmosaic can run the audio analysis routines.
 
 -----------------------------
 Optional Software
@@ -92,8 +92,9 @@ An easy way to permanently add this package to that search path is to create a `
 On my system this was in ::
     /usr/local/lib/python2.6/dist-packages
 
-The ``.pth`` file can be called anything you like e.g. ``hmosaic.pth`` and it should contain the full filepath to the directory containing the source code. So, if you unpacked the folder in ``/home/user/mosaicing`` then this is the path you should add to the .pth file.
+The ``.pth`` file can be called anything you like e.g. ``hmosaic.pth`` and it should contain the full filepath to the directory containing the top-level source code directory (``hmosaic``). So, if you unpacked the folder in ``/home/user/mosaicing`` then this is the path you should add to the .pth file.
 In this way you run the code from a python interpreter irrespective of which directory you are in at the time.
+
 
 *************************
 Configuring the Package
@@ -104,6 +105,9 @@ The following settings must be filled in::
 
     TARGET_REPO = '<path to directory to be used for segmenting and analysing targets>'
     SOURCE_REPO = '<path to directory containing source corpora>'
+    ESSENTIA_BIN_DIR =  os.path.join(os.path.dirname(__file__), 'analyser')    
+
+The last setting is a location for the essentia binary streaming extractor, along with the ``svm_models`` directory from the Essentia source code. By default, the system expects to find these in a folder called ``analyser`` in the same directory as the ``settings.py`` file, however they can be placed anaywhere and the full filepath supplied as the value for ``ESSENTIA_BIN_DIR``
 
 Everything else is optional, check the settings.py file for more details. 
 Each group of settings is commented.
@@ -122,9 +126,6 @@ Launch pure data and open ``hmosaic/puredata/mainGUI.pd``
 
 Check the connect box in the control panel and try selecting a corpus. You should see logging information 
 confirming your corpus selection in the terminal window.
-
-This video shows how to install the source package into the python path and create a mosaic using the ipython python interpreter
-
 
 
 ===========================================
@@ -544,10 +545,11 @@ This module contains examples of functions to plot experimental results using ma
    :members:
 
 
+===========================
+LICENCE
+===========================
 
-
-
-
-
-
+This software is copyright of John O'Connell, 2011.
+It is released under the GNU General Public licence: http://www.gnu.org/copyleft/gpl.html
+A copy of this licence is included in the ``COPYING`` file.
 

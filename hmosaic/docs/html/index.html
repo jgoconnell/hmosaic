@@ -73,7 +73,7 @@ a requirements file and installed in one go as described <a class="reference ext
 </blockquote>
 <p><em>Note:</em> You will need access to both the essentia and gaia source code. When compiling, the python wrappers for both libraries must also be installed.
 When you compile the essentia source code a binary streaming_extractor will be created. For more information on this process and all the software requirements please see the documentation for essentia and gaia.
-You will need to copy the streaming_extractor into the analyser directory in the hmosaic source package, along with the entire svm_models directory which comes with the essentia source code.</p>
+You will need to copy the streaming_extractor, along with the entire svm_models directory which comes with the essentia source code into a directory configured in <tt class="docutils literal"><span class="pre">settings.py</span></tt> as described below so that hmosaic can run the audio analysis routines.</p>
 </div>
 <div class="section" id="optional-software">
 <h3>Optional Software<a class="headerlink" href="#optional-software" title="Permalink to this headline">¶</a></h3>
@@ -124,7 +124,7 @@ An easy way to permanently add this package to that search path is to create a <
 On my system this was in</p>
 <div class="highlight-python"><pre>/usr/local/lib/python2.6/dist-packages</pre>
 </div>
-<p>The <tt class="docutils literal"><span class="pre">.pth</span></tt> file can be called anything you like e.g. <tt class="docutils literal"><span class="pre">hmosaic.pth</span></tt> and it should contain the full filepath to the directory containing the source code. So, if you unpacked the folder in <tt class="docutils literal"><span class="pre">/home/user/mosaicing</span></tt> then this is the path you should add to the .pth file.
+<p>The <tt class="docutils literal"><span class="pre">.pth</span></tt> file can be called anything you like e.g. <tt class="docutils literal"><span class="pre">hmosaic.pth</span></tt> and it should contain the full filepath to the directory containing the top-level source code directory (<tt class="docutils literal"><span class="pre">hmosaic</span></tt>). So, if you unpacked the folder in <tt class="docutils literal"><span class="pre">/home/user/mosaicing</span></tt> then this is the path you should add to the .pth file.
 In this way you run the code from a python interpreter irrespective of which directory you are in at the time.</p>
 </div>
 <div class="section" id="configuring-the-package">
@@ -133,8 +133,10 @@ In this way you run the code from a python interpreter irrespective of which dir
 The following settings must be filled in:</p>
 <div class="highlight-python"><div class="highlight"><pre><span class="n">TARGET_REPO</span> <span class="o">=</span> <span class="s">&#39;&lt;path to directory to be used for segmenting and analysing targets&gt;&#39;</span>
 <span class="n">SOURCE_REPO</span> <span class="o">=</span> <span class="s">&#39;&lt;path to directory containing source corpora&gt;&#39;</span>
+<span class="n">ESSENTIA_BIN_DIR</span> <span class="o">=</span>  <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">__file__</span><span class="p">),</span> <span class="s">&#39;analyser&#39;</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>The last setting is a location for the essentia binary streaming extractor, along with the <tt class="docutils literal"><span class="pre">svm_models</span></tt> directory from the Essentia source code. By default, the system expects to find these in a folder called <tt class="docutils literal"><span class="pre">analyser</span></tt> in the same directory as the <tt class="docutils literal"><span class="pre">settings.py</span></tt> file, however they can be placed anaywhere and the full filepath supplied as the value for <tt class="docutils literal"><span class="pre">ESSENTIA_BIN_DIR</span></tt></p>
 <p>Everything else is optional, check the settings.py file for more details.
 Each group of settings is commented.</p>
 </div>
@@ -147,7 +149,6 @@ Each group of settings is commented.</p>
 <p>Launch pure data and open <tt class="docutils literal"><span class="pre">hmosaic/puredata/mainGUI.pd</span></tt></p>
 <p>Check the connect box in the control panel and try selecting a corpus. You should see logging information
 confirming your corpus selection in the terminal window.</p>
-<p>This video shows how to install the source package into the python path and create a mosaic using the ipython python interpreter</p>
 </div>
 </div>
 <div class="section" id="tour-of-the-pure-data-mosaicing-framework">
@@ -936,7 +937,7 @@ the most recently target - useful for testing!</p>
 <dt id="hmosaic.corpus.FileCorpus.list_audio_files">
 <tt class="descname">list_audio_files</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/corpus.html#FileCorpus.list_audio_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.corpus.FileCorpus.list_audio_files" title="Permalink to this definition">¶</a></dt>
 <dd><p>Lists those audio files all audio files in the corpus.
-1 big assumption: Audio files are <a href="#id22"><span class="problematic" id="id23">*</span></a>.wav always!!</p>
+1 big assumption: Audio files have a &#8216;.wav&#8217; extension always!!</p>
 </dd></dl>
 
 <dl class="method">
@@ -1355,15 +1356,19 @@ is read and the current data is replaced by this new data.</p>
 <dt id="hmosaic.models.SegmentAudio">
 <em class="property">class </em><tt class="descclassname">hmosaic.models.</tt><tt class="descname">SegmentAudio</tt><big>(</big><em>filepath</em><big>)</big><a class="reference internal" href="_modules/hmosaic/models.html#SegmentAudio"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.models.SegmentAudio" title="Permalink to this definition">¶</a></dt>
 <dd><p>Very simple audio class - encapsulates the following information
-about an audio file:
-* <tt class="docutils literal"><span class="pre">filepath</span></tt> - location of original file.
-* <tt class="docutils literal"><span class="pre">audio_array</span></tt> - 32bit floating point array of audio signal.
-* <tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.
-* <tt class="docutils literal"><span class="pre">format</span></tt> - format of the wav file.
-* <tt class="docutils literal"><span class="pre">name</span></tt> - basename from the filepath
-* <tt class="docutils literal"><span class="pre">samples</span></tt> - number of samples in the array
-* <tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</p>
-<p>Designed to be used with a segmenter but it is generic enough
+about an audio file</p>
+<blockquote>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">filepath</span></tt> - location of original file.</li>
+<li><tt class="docutils literal"><span class="pre">audio_array</span></tt> - 32bit floating point array of audio signal.</li>
+<li><tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.</li>
+<li><tt class="docutils literal"><span class="pre">format</span></tt> - format of the wav file.</li>
+<li><tt class="docutils literal"><span class="pre">name</span></tt> - basename from the filepath</li>
+<li><tt class="docutils literal"><span class="pre">samples</span></tt> - number of samples in the array</li>
+<li><tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</li>
+</ul>
+</blockquote>
+<p>esigned to be used with a segmenter but it is generic enough
 to be used elsewhere (or as a base class)</p>
 </dd></dl>
 
@@ -1374,10 +1379,15 @@ to be used elsewhere (or as a base class)</p>
 to be the <tt class="docutils literal"><span class="pre">unit</span></tt> which is yielded in the <tt class="docutils literal"><span class="pre">segment</span></tt> routine.
 Unlike the SegmentAudio class, this Unit class does not read an audio
 file. All parameters are passed to it in the initialiser.</p>
-<p>It stores only the following attributes:
-* <tt class="docutils literal"><span class="pre">data</span></tt> - 32bit floating point array of audio signal.
-* <tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.
-* <tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</p>
+<dl class="docutils">
+<dt>It stores only the following attributes:</dt>
+<dd><ul class="first last simple">
+<li><tt class="docutils literal"><span class="pre">data</span></tt> - 32bit floating point array of audio signal.</li>
+<li><tt class="docutils literal"><span class="pre">sample_rate</span></tt> - Sampling rate of the audio.</li>
+<li><tt class="docutils literal"><span class="pre">length</span></tt> - Length of the audio in seconds.</li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -1544,7 +1554,7 @@ plus their name added to the db.</p>
 
 <dl class="function">
 <dt id="hmosaic.scripts.processTestData.analyse_essentia_files">
-<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">analyse_essentia_files</tt><big>(</big><em>corpus_name='test_corpus'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#analyse_essentia_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.analyse_essentia_files" title="Permalink to this definition">¶</a></dt>
+<tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">analyse_essentia_files</tt><big>(</big><em>corpus_name='&lt;name of current test corpus&gt;'</em><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#analyse_essentia_files"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.analyse_essentia_files" title="Permalink to this definition">¶</a></dt>
 <dd><p>Analyse all essentia units of segmentation type: <tt class="docutils literal"><span class="pre">chop</span></tt> in the test 
 corpus.</p>
 </dd></dl>
@@ -1621,8 +1631,8 @@ audio file name and segment duration.</p>
 <tt class="descclassname">hmosaic.scripts.processTestData.</tt><tt class="descname">gather_db_data</tt><big>(</big><big>)</big><a class="reference internal" href="_modules/hmosaic/scripts/processTestData.html#gather_db_data"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#hmosaic.scripts.processTestData.gather_db_data" title="Permalink to this definition">¶</a></dt>
 <dd><p>This function gets given a corpus and extracts the descriptors 
 for male, female, vocal and instrumental. It encapsulates this data, 
-along with audio file name, segment filepath and segment duration in a 
-<a href="#id24"><span class="problematic" id="id25">`</span></a>hmosaic.models.DBSegment object and then stores it in a 
+along with audio file name, segment filepath and segment duration in a  
+<tt class="docutils literal"><span class="pre">hmosaic.models.DBSegment</span></tt> object and then stores it in a 
 sqlite database.</p>
 </dd></dl>
 
@@ -1717,6 +1727,12 @@ the gender analysis for songs and segments.</p>
 
 </div>
 </div>
+<div class="section" id="licence">
+<h1>LICENCE<a class="headerlink" href="#licence" title="Permalink to this headline">¶</a></h1>
+<p>This software is copyright of John O&#8217;Connell, 2011.
+It is released under the GNU General Public licence: <a class="reference external" href="http://www.gnu.org/copyleft/gpl.html">http://www.gnu.org/copyleft/gpl.html</a>
+A copy of this licence is included in the <tt class="docutils literal"><span class="pre">COPYING</span></tt> file.</p>
+</div>
 
 
           </div>
@@ -1778,6 +1794,7 @@ the gender analysis for songs and segments.</p>
 <li><a class="reference internal" href="#plotresults-py">plotResults.py</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#licence">LICENCE</a></li>
 </ul>
 
   <h3>This Page</h3>

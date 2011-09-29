@@ -72,6 +72,7 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Information about the full source audio files</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">__storm_table__</span> <span class="o">=</span> <span class="s">&quot;song&quot;</span>
     <span class="nb">id</span> <span class="o">=</span> <span class="n">Int</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
     <span class="n">song_name</span> <span class="o">=</span> <span class="n">Unicode</span><span class="p">()</span>
@@ -104,16 +105,16 @@
 <div class="viewcode-block" id="SegmentAudio"><a class="viewcode-back" href="../../index.html#hmosaic.models.SegmentAudio">[docs]</a><span class="k">class</span> <span class="nc">SegmentAudio</span><span class="p">():</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Very simple audio class - encapsulates the following information</span>
-<span class="sd">        about an audio file:</span>
-<span class="sd">        * ``filepath`` - location of original file.</span>
-<span class="sd">        * ``audio_array`` - 32bit floating point array of audio signal.</span>
-<span class="sd">        * ``sample_rate`` - Sampling rate of the audio.</span>
-<span class="sd">        * ``format`` - format of the wav file.</span>
-<span class="sd">        * ``name`` - basename from the filepath</span>
-<span class="sd">        * ``samples`` - number of samples in the array</span>
-<span class="sd">        * ``length`` - Length of the audio in seconds. </span>
+<span class="sd">        about an audio file</span>
+<span class="sd">         *  ``filepath`` - location of original file.</span>
+<span class="sd">         *  ``audio_array`` - 32bit floating point array of audio signal.</span>
+<span class="sd">         *  ``sample_rate`` - Sampling rate of the audio.</span>
+<span class="sd">         *  ``format`` - format of the wav file.</span>
+<span class="sd">         *  ``name`` - basename from the filepath</span>
+<span class="sd">         *  ``samples`` - number of samples in the array</span>
+<span class="sd">         *  ``length`` - Length of the audio in seconds. </span>
 <span class="sd">            </span>
-<span class="sd">        Designed to be used with a segmenter but it is generic enough</span>
+<span class="sd">        esigned to be used with a segmenter but it is generic enough</span>
 <span class="sd">        to be used elsewhere (or as a base class)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -134,9 +135,9 @@
 <span class="sd">        file. All parameters are passed to it in the initialiser.</span>
 <span class="sd">        </span>
 <span class="sd">        It stores only the following attributes:</span>
-<span class="sd">        * ``data`` - 32bit floating point array of audio signal.</span>
-<span class="sd">        * ``sample_rate`` - Sampling rate of the audio.</span>
-<span class="sd">        * ``length`` - Length of the audio in seconds. </span>
+<span class="sd">         *  ``data`` - 32bit floating point array of audio signal.</span>
+<span class="sd">         *  ``sample_rate`` - Sampling rate of the audio.</span>
+<span class="sd">         *  ``length`` - Length of the audio in seconds. </span>
 <span class="sd">            </span>
 <span class="sd">    &quot;&quot;&quot;</span> 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">sample_rate</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
