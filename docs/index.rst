@@ -123,9 +123,6 @@ Launch pure data and open ``hmosaic/puredata/mainGUI.pd``
 Check the connect box in the control panel and try selecting a corpus. You should see logging information 
 confirming your corpus selection in the terminal window.
 
-This video shows how to install the source package into the python path and create a mosaic using the ipython python interpreter
-
-
 
 ===========================================
 Tour of the pure data mosaicing framework
@@ -547,6 +544,10 @@ This module contains examples of functions to plot experimental results using ma
 ===========================
 LICENCE
 ===========================
+
+This software is copyright of John O'Connell, 2011.
+It is released under the following licence:
+
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007

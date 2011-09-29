@@ -2,3 +2,4 @@
 *.pickle
 index.doctree
 .buildinfo
+*.zip
