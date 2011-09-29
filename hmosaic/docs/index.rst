@@ -92,7 +92,7 @@ An easy way to permanently add this package to that search path is to create a `
 On my system this was in ::
     /usr/local/lib/python2.6/dist-packages
 
-The ``.pth`` file can be called anything you like e.g. ``hmosaic.pth`` and it should contain the full filepath to the directory containing the top-level source code directory (``hmosaic``). So, if you unpacked the folder in ``/home/user/mosaicing`` then this is the path you should add to the .pth file.
+The ``.pth`` file can be called anything you like e.g. ``hmosaic.pth`` and it should contain the full filepath to the directory containing the top-level source code directory (``hmosaic``). 
 In this way you run the code from a python interpreter irrespective of which directory you are in at the time.
 
 
