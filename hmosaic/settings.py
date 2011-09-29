@@ -20,7 +20,7 @@ TARGET_REPO = '<path to directory to be used for segmenting and analysing target
 SOURCE_REPO = '<path to directory containing source corpora>'
 
 # Default directory of the binary analysers is a directory called 'analyser'
-# which is located in the same directory as this file. 
+# which ought to be located in the same directory as this file. 
 ESSENTIA_BIN_DIR =  os.path.join(os.path.dirname(__file__), 'analyser') 
 
 # Names of the analyser binary to use
