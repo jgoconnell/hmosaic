@@ -1,0 +1,122 @@
+#N canvas 349 97 982 620 10;
+#X obj 104 120 vradio 15 1 0 4 empty empty empty 0 -8 0 10 -13381 -1
+-4160 2;
+#X text 62 272 In here put functionality to send the target with onsets
+to the playbuffer. Also put functionality to set the onsets weights
+and which types are used.;
+#X msg 84 464 complex;
+#X msg 140 465 rms;
+#X obj 232 469 f;
+#X obj 105 196 hsl 30 15 0 1 0 0 empty empty Weight -2 -8 0 8 -13381
+-1 -1 1600 1;
+#X msg 46 467 hfc;
+#X obj 217 515 pack s f;
+#X obj 273 515 print packed;
+#X obj 291 660 t l;
+#X obj 193 657 list append;
+#X text 320 659 Store the list;
+#X obj 290 699 print stored;
+#X obj 124 613 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X obj 107 657 list prepend;
+#X obj 59 739 print sending;
+#X text 146 610 Send;
+#X obj 297 581 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X text 318 577 Clear;
+#X obj 355 386 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X obj 229 435 t f b;
+#X text 122 114 hfc;
+#X text 122 130 complex;
+#X text 124 146 rms;
+#X text 122 162 flux;
+#X obj 108 387 select 0 1 2 3;
+#X msg 179 465 flux;
+#X text 623 28 Aubio detection params Some kind of minimum note length?
+It's crude but it might work.;
+#X obj 216 138 hsl 60 15 0 2 0 0 \$0_minlength empty Minimum_length
+-2 -8 0 8 -258113 -1 -1 0 1;
+#X floatatom 668 106 5 0 0 0 - - -;
+#X obj 690 167 s aubiolength;
+#X obj 483 350 s aubiotoggle;
+#X obj 122 101 tgl 15 0 aubiooff empty Essentia 17 7 0 8 -13381 -1
+-1 1 1;
+#X obj 229 102 tgl 15 0 essentiaoff empty Aubio 17 7 0 8 -258113 -1
+-1 0 1;
+#X obj 549 58 r aubiooff;
+#X obj 463 62 r essentiaoff;
+#X obj 614 416 cnv 15 200 130 empty empty empty 20 12 0 14 -262144
+-66577 0;
+#X obj 102 211 nbx 3 14 -1e+37 1e+37 0 0 empty empty empty 0 -8 0 10
+-13381 -1 -1 0.551724 256;
+#X obj 158 189 bng 15 250 50 0 \$0_clear empty Clear_List 17 7 0 8
+-13381 -1 -1;
+#X obj 205 251 bng 15 250 50 0 empty empty empty 17 7 0 10 -262144
+-1 -1;
+#X obj 158 208 bng 15 250 50 0 \$0_send empty Send_List 17 7 0 8 -13381
+-1 -1;
+#X obj 213 157 nbx 5 14 -1e+37 1e+37 0 0 empty empty empty 0 -8 0 10
+-258113 -1 -1 0 256;
+#X obj 666 75 r \$0_minlength;
+#X obj 286 561 r \$0_clear;
+#X obj 117 593 r \$0_send;
+#X obj 268 48 select 1;
+#X msg 281 70 0;
+#X obj 89 49 loadbang;
+#X msg 113 73 1;
+#X obj 161 41 select 1;
+#X msg 174 63 0;
+#X obj 550 253 select 1;
+#X obj 462 252 select 1;
+#X text 614 277 1 for aubio \, 0 for essentia;
+#X msg 553 286 0;
+#X msg 467 281 1;
+#X obj 155 738 s setonsets;
+#X connect 0 0 20 0;
+#X connect 2 0 7 0;
+#X connect 3 0 7 0;
+#X connect 4 0 7 1;
+#X connect 5 0 4 1;
+#X connect 5 0 37 0;
+#X connect 6 0 7 0;
+#X connect 7 0 8 0;
+#X connect 7 0 10 0;
+#X connect 9 0 10 1;
+#X connect 10 0 9 0;
+#X connect 10 0 12 0;
+#X connect 10 0 14 1;
+#X connect 13 0 14 0;
+#X connect 14 0 56 0;
+#X connect 14 0 15 0;
+#X connect 17 0 10 1;
+#X connect 17 0 14 1;
+#X connect 19 0 4 0;
+#X connect 20 0 25 0;
+#X connect 20 1 4 0;
+#X connect 25 0 6 0;
+#X connect 25 1 2 0;
+#X connect 25 2 3 0;
+#X connect 25 3 26 0;
+#X connect 26 0 7 0;
+#X connect 28 0 41 0;
+#X connect 29 0 30 0;
+#X connect 32 0 45 0;
+#X connect 33 0 49 0;
+#X connect 34 0 51 0;
+#X connect 35 0 52 0;
+#X connect 42 0 29 0;
+#X connect 43 0 10 1;
+#X connect 43 0 14 1;
+#X connect 44 0 14 0;
+#X connect 45 0 46 0;
+#X connect 46 0 33 0;
+#X connect 47 0 48 0;
+#X connect 48 0 32 0;
+#X connect 49 0 50 0;
+#X connect 50 0 32 0;
+#X connect 51 0 54 0;
+#X connect 52 0 55 0;
+#X connect 54 0 31 0;
+#X connect 55 0 31 0;
+#X coords 0 -1 1 1 200 125 2 100 100;
