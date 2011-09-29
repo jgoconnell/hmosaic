@@ -12,7 +12,7 @@ from OSC import OSCServer, OSCMessage, OSCClient, OSCBundle
 from hmosaic import log, settings
 from hmosaic.analyse import EssentiaAnalyser, EssentiaError
 from hmosaic.models import Mosaic, MosaicUnit
-from hmosaic.corpus import FileCorpusManager, FileNotFoundException
+from hmosaic.corpus import FileCorpusManager, FileNotFoundException, CorpusDoesNotExistException
 from hmosaic.utils import switch_ext, wav_timestamp, calc_chop_from_bpm
 from hmosaic.utils import secs_to_samps, timestretch
 from hmosaic.scripts import analyse_corpus
@@ -144,12 +144,41 @@ class HighLevelControl(object):
         self.con_cost = False
         
 
-        # Set up the target corpi
+        # Set up the target corpora
         self.cm = FileCorpusManager(settings.TARGET_REPO)
-        self.temp_corpus = self.cm.load_corpus('temp')
-        self.context_corpus = self.cm.load_corpus('context')
-        self.mosaic_corpus = self.cm.load_corpus('mosaics')
-        self.target_corpus = self.cm.load_corpus('target')
+
+        try:
+            self.temp_corpus = self.cm.load_corpus('temp')
+        except CorpusDoesNotExistException, e:
+            log.error(e)
+            log.info("Creating temp corpus in target corpus repo")
+            self.cm.create_corpus('temp')
+            self.temp_corpus = self.cm.load_corpus('temp')
+       
+        try: 
+            self.context_corpus = self.cm.load_corpus('context')
+        except CorpusDoesNotExistException, e:
+            log.error(e)
+            log.info("Creating context corpus in target corpus repo")
+            self.cm.create_corpus('context')
+            self.context_corpus = self.cm.load_corpus('context')
+
+        try:
+            self.mosaic_corpus = self.cm.load_corpus('mosaics')
+        except CorpusDoesNotExistException, e:
+            log.error(e)
+            log.info("Creating mosaic corpus in target corpus repo")
+            self.cm.create_corpus('mosaics')
+            self.mosaic_corpus = self.cm.load_corpus('mosaics')
+
+        try:
+            self.target_corpus = self.cm.load_corpus('target')
+        except CorpusDoesNotExistException, e:
+            log.error(e)
+            log.info("Creating target corpus in target corpus repo")
+            self.cm.create_corpus('target')
+            self.target_corpus = self.cm.load_corpus('target')
+
     
         # Create a reference to the source corpus manager
         self.source_manager = source_manager       
