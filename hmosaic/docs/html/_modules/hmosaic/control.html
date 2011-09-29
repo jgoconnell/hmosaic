@@ -60,7 +60,7 @@
 <span class="kn">from</span> <span class="nn">hmosaic</span> <span class="kn">import</span> <span class="n">log</span><span class="p">,</span> <span class="n">settings</span>
 <span class="kn">from</span> <span class="nn">hmosaic.analyse</span> <span class="kn">import</span> <span class="n">EssentiaAnalyser</span><span class="p">,</span> <span class="n">EssentiaError</span>
 <span class="kn">from</span> <span class="nn">hmosaic.models</span> <span class="kn">import</span> <span class="n">Mosaic</span><span class="p">,</span> <span class="n">MosaicUnit</span>
-<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span><span class="p">,</span> <span class="n">FileNotFoundException</span>
+<span class="kn">from</span> <span class="nn">hmosaic.corpus</span> <span class="kn">import</span> <span class="n">FileCorpusManager</span><span class="p">,</span> <span class="n">FileNotFoundException</span><span class="p">,</span> <span class="n">CorpusDoesNotExistException</span>
 <span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">switch_ext</span><span class="p">,</span> <span class="n">wav_timestamp</span><span class="p">,</span> <span class="n">calc_chop_from_bpm</span>
 <span class="kn">from</span> <span class="nn">hmosaic.utils</span> <span class="kn">import</span> <span class="n">secs_to_samps</span><span class="p">,</span> <span class="n">timestretch</span>
 <span class="kn">from</span> <span class="nn">hmosaic.scripts</span> <span class="kn">import</span> <span class="n">analyse_corpus</span>
@@ -192,12 +192,41 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">con_cost</span> <span class="o">=</span> <span class="bp">False</span>
         
 
-        <span class="c"># Set up the target corpi</span>
+        <span class="c"># Set up the target corpora</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cm</span> <span class="o">=</span> <span class="n">FileCorpusManager</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">TARGET_REPO</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;temp&#39;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">context_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;context&#39;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;mosaics&#39;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;temp&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusDoesNotExistException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating temp corpus in target corpus repo&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;temp&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">temp_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;temp&#39;</span><span class="p">)</span>
+       
+        <span class="k">try</span><span class="p">:</span> 
+            <span class="bp">self</span><span class="o">.</span><span class="n">context_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;context&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusDoesNotExistException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating context corpus in target corpus repo&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;context&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;context&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;mosaics&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusDoesNotExistException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating mosaic corpus in target corpus repo&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;mosaics&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mosaic_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;mosaics&#39;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">CorpusDoesNotExistException</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s">&quot;Creating target corpus in target corpus repo&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">create_corpus</span><span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">target_corpus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cm</span><span class="o">.</span><span class="n">load_corpus</span><span class="p">(</span><span class="s">&#39;target&#39;</span><span class="p">)</span>
+
     
         <span class="c"># Create a reference to the source corpus manager</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">source_manager</span> <span class="o">=</span> <span class="n">source_manager</span>       
